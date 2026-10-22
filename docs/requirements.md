@@ -1,13 +1,11 @@
 1.Project overview
-FoodFlow is a full-stack food ordering platform that allows customers to browse a restaurant's menu, add items to their cart, place orders, and track order status in real time. Restaurant staff can manage menu items and process incoming orders, while administrators can manage users and oversee platform operations.
-
+FoodFlow is a full-stack food ordering platform for a single restaurant, allowing customers to browse the menu, manage a shopping cart, place pickup orders, and track order progress in real time. Customers pay when collecting their orders at the restaurant. Restaurant staff manage menu items and process orders, while administrators manage user accounts and oversee platform operations.
 2.User roles
 Customer - Register and log in securely, Browse available menu items and view item details, 
           Add, update, and remove items from the cart, Place orders and view order history,
           Track the status of active orders, Cancel eligible orders.
 Restaurant Staff - View incoming orders, Accept or reject orders, Update order status, Manage menu items and their prices and availability
 Administrator - View and manage registered users, Manage restaurant staff accounts and permissions, View all orders and their statuses,
-                Monitor platform activity and resolve basic operational issues
 
 3.User stories with acceptance criteria 
 US-01: Customer Registration
@@ -15,22 +13,28 @@ As a customer, I want to create an account so that I can place and manage orders
 Acceptance criteria:
 The customer can register with a name, email address, and password.
 The email address must be valid and unique.
-The password must meet the defined security requirements.
+The password must contain at least 8 characters, including at least one letter and one number
 Invalid input produces clear validation messages.
 Passwords are securely hashed before being stored.
 
 US-02: Customer Login
 As a customer, I want to log in securely so that I can access my account.
 Acceptance criteria:
-Valid credentials allow the customer to log in.
-Invalid credentials return a generic authentication error.
-Protected endpoints reject unauthenticated requests.
-Customers cannot access staff or administrator functionality.
+- A registered user can log in with a valid email and password.
+- Invalid credentials return a generic error without revealing whether the email exists.
+- The access token expires after a configured period.
+- An authenticated user can log out, and the client clears its authentication state and stored tokens.
+- A valid refresh token can be used to obtain a new access token without logging in again.
+- Invalid, expired, or revoked refresh tokens are rejected, requiring the user to log in again.
+- Refresh tokens are invalidated on logout, according to the chosen token-storage and revocation strategy.
+- Protected endpoints reject requests without a valid access token.
+- Customers cannot access staff or administrator functionality.
+Implementation note: If you use refresh-token rotation, invalidate the previous refresh token whenever a new one is issued.
 
 US-03: Browse Menu
 As a customer, I want to browse the food menu so that I can choose items to order.
 Acceptance criteria:
-The customer can view available menu items with names, restsursnt name, descriptions, prices, and images where available.
+The customer can view available menu items with names, descriptions, prices, and images where available.
 Unavailable items are clearly identified and cannot be ordered.
 The customer can search for items by name.
 Menu data is retrieved from the backend API.
@@ -138,11 +142,83 @@ US-16: View All Orders
 As an administrator, I want to view all platform orders so that I can oversee order processing.
 Acceptance criteria:
 Administrators can view orders across all customers.
-Orders can be filtered by status, restaurant name and date.
+Orders can be filtered by status and date.
 Order details include the customer reference, items, total, and status.
 Only authorized administrators can access the complete order list.
 
-4.Non-functional requirements
+US-17: Auto-cancel unaccepted orders
+As the system, I want to cancel orders that staff don’t accept within 15 minutes, so that customers aren’t left waiting.
+A delayed job is scheduled when an order is placed.
+If the order is still PENDING when the job runs, it becomes CANCELLED with the reason “Not accepted in time.”
+If staff already acted on the order, the job does nothing.
+The customer is notified in real time.
+
+US-18: Complete a Collected Order
+As a restaurant staff member, I want to mark an order as completed after the customer collects it so that the order lifecycle is accurately recorded.
+Acceptance criteria:
+Staff can mark an order as COMPLETED only when its current status is READY.
+The backend validates the current status before completing the order.
+The completed status is persisted in the database.
+The customer can see the updated status in their order history and order tracking view.
+Attempts to complete an order in any other status are rejected.
+
+US-19: Manage menu categories
+As an admin, I want to create, view, update, and deactivate menu categories so that menu items can be organized and customers can filter the menu by category.
+Acceptance criteria:
+- Admins can create a category with a required name.
+- Category names must be unique, ignoring case and leading/trailing whitespace.
+- Admins can view all categories and update a category’s name.
+- Admins can deactivate a category so it no longer appears as an available customer-facing filter.
+- Existing menu items assigned to a deactivated category remain stored; the system must handle their visibility consistently.
+- Categories assigned to existing menu items cannot be hard-deleted; admins must deactivate them instead.
+- Only admins can manage categories.
+- Customers can filter menu items by active category, as specified in US-04.
+- when a category is deactivated,  its existing menu items should remain visible without a category filter
+
+4. Order Status State Machine
+   
+4.1 Order Statuses
+
+Status          Description
+PENDING          The order has been placed and awaits restaurant action.
+ACCEPTED         The restaurant has accepted the order.
+PREPARING        The restaurant is preparing the order.
+READY            The order is ready for customer collection.
+COMPLETED        The customer has collected the order.
+REJECTED         The restaurant has rejected the order.
+CANCELLED        The customer or system has cancelled the pending order.
+
+4.2 Allowed Transitions
+
+From          To          Authorized actor
+PENDING          ACCEPTED          Restaurant staff
+PENDING          REJECTED          Restaurant staff
+PENDING          CANCELLED         Customer or system timeout handler
+ACCEPTED         PREPARING         Restaurant staff
+PREPARING        READY             Restaurant staff
+READY            COMPLETED         Restaurant staff, after collection
+
+4.3 Transition Rules
+
+Any transition not explicitly listed in the allowed transitions table must be rejected.
+The backend must verify both the current status and the requesting actor's authorization.
+A status update must be persisted before it is reported as successful.
+Concurrent requests must not cause invalid transitions or overwrite a newer status.
+Terminal statuses are COMPLETED, REJECTED, and CANCELLED. Orders in these states cannot transition to another status.
+System-triggered cancellation applies only to PENDING orders that exceed a configured timeout. The timeout mechanism is a later enhancement unless explicitly added to the MVP.
+Each successful status transition should record the previous status, new status, timestamp, and actor for auditing.
+
+4.4 State Machine Testing Requirements
+
+Automated tests must verify:
+Every allowed transition succeeds for an authorized actor.
+Every unlisted transition is rejected.
+Unauthorized actors cannot perform status changes.
+A customer cannot cancel an order belonging to another customer.
+Completed, rejected, and cancelled orders cannot be reopened.
+Concurrent status updates cannot result in an invalid final state.
+
+5.Non-functional requirements
 NFR-01: Security
 Passwords must be hashed using a suitable password-hashing algorithm.
 Authentication and role-based authorization must be enforced on the backend.
@@ -174,7 +250,7 @@ Critical order-processing flows must have automated regression tests.
 NFR-06: Scalability
 The application must use stateless API instances where practical.
 Database connection pooling and pagination must be configured appropriately.
-Redis caching and BullMQ-based asynchronous processing may be introduced when needed.
+Redis caching and BullMQ-based asynchronous processing.
 
 NFR-07: Observability
 The application must record useful operational errors and important order-processing events.
@@ -187,50 +263,61 @@ Forms must provide clear validation and error messages.
 Important actions must show their current state and outcome.
 Core navigation and forms should support keyboard access and accessible labels.
 
-5.MVP scope vs. later scope
-5.1MVP scope
+6.MVP scope vs. later scope
+6.1 MVP scope
 The MVP will focus on a complete ordering workflow for a single restaurant.
 
 Customer features
 Registration and login.
 Menu browsing, searching, and category filtering.
-Cart management.
-Checkout and order placement.
+Cart management using Zustand and localStorage.
+Checkout with a minimum order value of LKR 500.
+Optional order notes of up to 250 characters.
+Pickup order placement and pay-on-collection instructions
 Order history and status viewing.
-Cancellation of eligible orders.
+Cancellation of PENDING orders
+Socket.IO for real-time order status updates.
 
 Restaurant staff features
 View incoming orders.
-Accept or reject orders.
+Accept or reject pending orders.
 Update preparation status.
-Create, edit, and deactivate menu items.
+Mark orders ready for collection.
+Mark collected orders as completed.
+Record payment received at collection.
+Create, edit, and deactivate menu items
 
 Administrator features
 View and manage user accounts.
 Manage staff accounts and roles.
 View and filter all orders.
+
 Technical requirements
 React frontend with a Node.js and Express.js TypeScript REST API.
 PostgreSQL database with Prisma ORM.
+Zustand and localStorage for frontend cart state.
 JWT-based authentication and role-based authorization.
 Backend validation and consistent error handling.
+Explicit order status state machine with validated transitions.
+Separate order and payment statuses.
 Transactional order creation and server-side price calculation.
 Automated tests for core workflows.
 API documentation with Swagger/OpenAPI.
 Docker-based local development and a clear README.
+CI/CD pipeline and production deployment.
+Automatic cancellation of pending orders after a configured timeout.
 
-5.2later scope
-Socket.IO for real-time order status updates.
+6.2later scope
+
 Payment gateway integration and verified payment webhooks.
 Email notifications for order updates.
 Inventory tracking and low-stock alerts.
 Discounts, coupons, and promotional campaigns.
 Customer ratings and reviews.
 Analytics dashboards and order reports.
-CI/CD pipeline and production deployment.
 More advanced monitoring and performance testing.
 
-6.Out of scope 
+7.Out of scope 
 
 Multiple restaurants, restaurant discovery, and multi-restaurant carts.
 Delivery driver assignment, GPS tracking, and live delivery maps.
