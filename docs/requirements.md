@@ -272,7 +272,6 @@ Customer features
 Registration and login.
 Menu browsing, searching, and category filtering.
 Cart management using Zustand and localStorage.
-Checkout with a minimum order value of LKR 500.
 Optional order notes of up to 250 characters.
 Pickup order placement and pay-on-collection instructions
 Order history and status viewing.
