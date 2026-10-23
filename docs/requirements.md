@@ -7,7 +7,8 @@ Customer - Register and log in securely, Browse available menu items and view it
 Restaurant Staff - View incoming orders, Accept or reject orders, Update order status, Manage menu items and their prices and availability
 Administrator - View and manage registered users, Manage restaurant staff accounts and permissions, View all orders and their statuses,
 
-3.User stories with acceptance criteria 
+3.User stories with acceptance criteria
+
 US-01: Customer Registration
 As a customer, I want to create an account so that I can place and manage orders.
 Acceptance criteria:
