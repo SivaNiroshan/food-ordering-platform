@@ -1,9 +1,9 @@
 1.Project overview
 FoodFlow is a full-stack food ordering platform for a single restaurant, allowing customers to browse the menu, manage a shopping cart, place pickup orders, and track order progress in real time. Customers pay when collecting their orders at the restaurant. Restaurant staff manage menu items and process orders, while administrators manage user accounts and oversee platform operations.
 2.User roles
-Customer - Register and log in securely, Browse available menu items and view item details, 
-          Add, update, and remove items from the cart, Place orders and view order history,
-          Track the status of active orders, Cancel eligible orders.
+Customer - Register and log in securely, Browse available menu items and view item details,
+Add, update, and remove items from the cart, Place orders and view order history,
+Track the status of active orders, Cancel eligible orders.
 Restaurant Staff - View incoming orders, Accept or reject orders, Update order status, Manage menu items and their prices and availability
 Administrator - View and manage registered users, Manage restaurant staff accounts and permissions, View all orders and their statuses,
 
@@ -21,6 +21,7 @@ Passwords are securely hashed before being stored.
 US-02: Customer Login
 As a customer, I want to log in securely so that I can access my account.
 Acceptance criteria:
+
 - A registered user can log in with a valid email and password.
 - Invalid credentials return a generic error without revealing whether the email exists.
 - The access token expires after a configured period.
@@ -30,7 +31,7 @@ Acceptance criteria:
 - Refresh tokens are invalidated on logout, according to the chosen token-storage and revocation strategy.
 - Protected endpoints reject requests without a valid access token.
 - Customers cannot access staff or administrator functionality.
-Implementation note: If you use refresh-token rotation, invalidate the previous refresh token whenever a new one is issued.
+  Implementation note: If you use refresh-token rotation, invalidate the previous refresh token whenever a new one is issued.
 
 US-03: Browse Menu
 As a customer, I want to browse the food menu so that I can choose items to order.
@@ -166,6 +167,7 @@ Attempts to complete an order in any other status are rejected.
 US-19: Manage menu categories
 As an admin, I want to create, view, update, and deactivate menu categories so that menu items can be organized and customers can filter the menu by category.
 Acceptance criteria:
+
 - Admins can create a category with a required name.
 - Category names must be unique, ignoring case and leading/trailing whitespace.
 - Admins can view all categories and update a category’s name.
@@ -174,30 +176,30 @@ Acceptance criteria:
 - Categories assigned to existing menu items cannot be hard-deleted; admins must deactivate them instead.
 - Only admins can manage categories.
 - Customers can filter menu items by active category, as specified in US-04.
-- when a category is deactivated,  its existing menu items should remain visible without a category filter
+- when a category is deactivated, its existing menu items should remain visible without a category filter
 
 4. Order Status State Machine
-   
+
 4.1 Order Statuses
 
-Status          Description
-PENDING          The order has been placed and awaits restaurant action.
-ACCEPTED         The restaurant has accepted the order.
-PREPARING        The restaurant is preparing the order.
-READY            The order is ready for customer collection.
-COMPLETED        The customer has collected the order.
-REJECTED         The restaurant has rejected the order.
-CANCELLED        The customer or system has cancelled the pending order.
+Status Description
+PENDING The order has been placed and awaits restaurant action.
+ACCEPTED The restaurant has accepted the order.
+PREPARING The restaurant is preparing the order.
+READY The order is ready for customer collection.
+COMPLETED The customer has collected the order.
+REJECTED The restaurant has rejected the order.
+CANCELLED The customer or system has cancelled the pending order.
 
 4.2 Allowed Transitions
 
-From          To          Authorized actor
-PENDING          ACCEPTED          Restaurant staff
-PENDING          REJECTED          Restaurant staff
-PENDING          CANCELLED         Customer or system timeout handler
-ACCEPTED         PREPARING         Restaurant staff
-PREPARING        READY             Restaurant staff
-READY            COMPLETED         Restaurant staff, after collection
+From To Authorized actor
+PENDING ACCEPTED Restaurant staff
+PENDING REJECTED Restaurant staff
+PENDING CANCELLED Customer or system timeout handler
+ACCEPTED PREPARING Restaurant staff
+PREPARING READY Restaurant staff
+READY COMPLETED Restaurant staff, after collection
 
 4.3 Transition Rules
 
@@ -317,7 +319,7 @@ Customer ratings and reviews.
 Analytics dashboards and order reports.
 More advanced monitoring and performance testing.
 
-7.Out of scope 
+7.Out of scope
 
 Multiple restaurants, restaurant discovery, and multi-restaurant carts.
 Delivery driver assignment, GPS tracking, and live delivery maps.
