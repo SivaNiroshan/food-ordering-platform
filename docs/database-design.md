@@ -101,18 +101,19 @@ erDiagram
 
 ## 2. Enums
 
-| Enum | Values |
-|---|---|
-| `UserRole` | `CUSTOMER`, `STAFF`, `ADMIN` |
-| `OrderStatus` | `PENDING`, `ACCEPTED`, `REJECTED`, `PREPARING`, `READY`, `COMPLETED`, `CANCELLED` |
-| `PaymentMethod` | `PAY_ON_COLLECTION` (future: `CARD`) |
-| `PaymentStatus` | `UNPAID`, `PAID` (future: `REFUNDED`) |
-| `OrderChangeSource` | `CUSTOMER`, `STAFF`, `SYSTEM` |
-| `OrderReasonCode` | `CUSTOMER_REQUEST`, `ITEM_UNAVAILABLE`, `KITCHEN_BUSY`, `RESTAURANT_CLOSING`, `ACCEPTANCE_TIMEOUT`, `OTHER` |
+| Enum                | Values                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `UserRole`          | `CUSTOMER`, `STAFF`, `ADMIN`                                                                                |
+| `OrderStatus`       | `PENDING`, `ACCEPTED`, `REJECTED`, `PREPARING`, `READY`, `COMPLETED`, `CANCELLED`                           |
+| `PaymentMethod`     | `PAY_ON_COLLECTION` (future: `CARD`)                                                                        |
+| `PaymentStatus`     | `UNPAID`, `PAID` (future: `REFUNDED`)                                                                       |
+| `OrderChangeSource` | `CUSTOMER`, `STAFF`, `SYSTEM`                                                                               |
+| `OrderReasonCode`   | `CUSTOMER_REQUEST`, `ITEM_UNAVAILABLE`, `KITCHEN_BUSY`, `RESTAURANT_CLOSING`, `ACCEPTANCE_TIMEOUT`, `OTHER` |
 
 ## 3. Constraints
 
 **Primary and unique keys**
+
 - Every table uses a UUID primary key.
 - `users.email_normalized` is unique (prevents `A@x.com` and `a@x.com` both registering).
 - `categories.name_normalized` is unique.
@@ -120,6 +121,7 @@ erDiagram
 - `orders (customer_id, idempotency_key)` is a composite unique constraint.
 
 **Foreign keys** (all `ON DELETE RESTRICT`; nothing that orders depend on is ever hard-deleted)
+
 - `refresh_tokens.user_id → users.id`
 - `refresh_tokens.replaced_by_token_id → refresh_tokens.id`
 - `menu_items.category_id → categories.id`
@@ -130,6 +132,7 @@ erDiagram
 - `order_status_history.changed_by_id → users.id`
 
 **CHECK constraints**
+
 - `menu_items.price >= 0`
 - `orders.subtotal >= 0`
 - `order_items.unit_price >= 0`
@@ -143,16 +146,16 @@ erDiagram
 
 PostgreSQL does not index foreign key columns automatically, so these are added explicitly.
 
-| Index | Supports |
-|---|---|
-| `orders (customer_id, created_at DESC)` | Customer order history, newest first (US-07) |
-| `orders (status, created_at)` | Staff order queue and admin status filter (US-10, US-16) |
+| Index                                                   | Supports                                                          |
+| ------------------------------------------------------- | ----------------------------------------------------------------- |
+| `orders (customer_id, created_at DESC)`                 | Customer order history, newest first (US-07)                      |
+| `orders (status, created_at)`                           | Staff order queue and admin status filter (US-10, US-16)          |
 | `orders (acceptance_deadline) WHERE status = 'PENDING'` | Recovery sweep for overdue orders if a BullMQ job is lost (US-17) |
-| `order_items (order_id)` | Loading the items of an order |
-| `order_items (menu_item_id)` | FK lookups; checking whether an item appears in orders |
-| `order_status_history (order_id, changed_at)` | Status timeline of an order; latest rejection/cancellation reason |
-| `menu_items (category_id)` | Category filter on the menu (US-04) |
-| `refresh_tokens (user_id)` | Revoking all of a user's tokens (logout everywhere, deactivation) |
+| `order_items (order_id)`                                | Loading the items of an order                                     |
+| `order_items (menu_item_id)`                            | FK lookups; checking whether an item appears in orders            |
+| `order_status_history (order_id, changed_at)`           | Status timeline of an order; latest rejection/cancellation reason |
+| `menu_items (category_id)`                              | Category filter on the menu (US-04)                               |
+| `refresh_tokens (user_id)`                              | Revoking all of a user's tokens (logout everywhere, deactivation) |
 
 Unique constraints already create indexes for: `users.email_normalized`, `categories.name_normalized`, `refresh_tokens.token_hash`, `orders (customer_id, idempotency_key)`.
 
@@ -171,6 +174,7 @@ Floating-point numbers cannot represent values like 0.1 exactly, so totals drift
 
 **Soft delete for menu items and categories.**
 Items referenced by past orders cannot be deleted (FK `RESTRICT`).
+
 - `is_active = false`: removed from the menu and hidden from customers.
 - `is_available = false`: sold out today; shown to customers but cannot be ordered.
 
@@ -201,14 +205,14 @@ If 0 rows are updated, another actor changed the order first, and the API return
 
 **Allowed transitions**
 
-| From | To | Actor |
-|---|---|---|
-| — | `PENDING` | Customer (order placed) |
-| `PENDING` | `ACCEPTED`, `REJECTED` | Staff |
-| `PENDING` | `CANCELLED` | Customer, or System (timeout) |
-| `ACCEPTED` | `PREPARING` | Staff |
-| `PREPARING` | `READY` | Staff |
-| `READY` | `COMPLETED` | Staff |
+| From        | To                     | Actor                         |
+| ----------- | ---------------------- | ----------------------------- |
+| —           | `PENDING`              | Customer (order placed)       |
+| `PENDING`   | `ACCEPTED`, `REJECTED` | Staff                         |
+| `PENDING`   | `CANCELLED`            | Customer, or System (timeout) |
+| `ACCEPTED`  | `PREPARING`            | Staff                         |
+| `PREPARING` | `READY`                | Staff                         |
+| `READY`     | `COMPLETED`            | Staff                         |
 
 Any other transition is rejected.
 
