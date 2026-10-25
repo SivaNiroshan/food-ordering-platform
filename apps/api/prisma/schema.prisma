@@ -1,0 +1,186 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PAY_ON_COLLECTION
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum OrderChangeSource {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+enum OrderReasonCode {
+  CUSTOMER_REQUEST
+  ITEM_UNAVAILABLE
+  KITCHEN_BUSY
+  RESTAURANT_CLOSING
+  ACCEPTANCE_TIMEOUT
+  OTHER
+}
+
+// ---------- Users & auth ----------
+
+model User {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  name            String   @db.VarChar(100)
+  email           String   @db.VarChar(255)
+  emailNormalized String   @unique @map("email_normalized") @db.VarChar(255)
+  passwordHash    String   @map("password_hash")
+  role            UserRole @default(CUSTOMER)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders        Order[]
+  refreshTokens RefreshToken[]
+  statusChanges OrderStatusHistory[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  replacedByTokenId String?   @unique @map("replaced_by_token_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedByTokenId], references: [id], onDelete: Restrict)
+  replaces   RefreshToken? @relation("TokenRotation")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ---------- Menu ----------
+
+model Category {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  name           String   @db.VarChar(100)
+  nameNormalized String   @unique @map("name_normalized") @db.VarChar(100)
+  description    String?  @db.VarChar(500)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  menuItems MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?  @map("image_url") @db.VarChar(2048)
+  isAvailable Boolean  @default(true) @map("is_available")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+// ---------- Orders ----------
+
+model Order {
+  id                 String        @id @default(uuid(7)) @db.Uuid
+  customerId         String        @map("customer_id") @db.Uuid
+  status             OrderStatus   @default(PENDING)
+  paymentMethod      PaymentMethod @default(PAY_ON_COLLECTION) @map("payment_method")
+  paymentStatus      PaymentStatus @default(UNPAID) @map("payment_status")
+  subtotal           Decimal       @db.Decimal(10, 2)
+  notes              String?       @db.VarChar(300)
+  acceptanceDeadline DateTime      @map("acceptance_deadline") @db.Timestamptz(6)
+  idempotencyKey     String        @map("idempotency_key") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer      User                 @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([status, acceptanceDeadline])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  menuItemId String   @map("menu_item_id") @db.Uuid
+  itemName   String   @map("item_name") @db.VarChar(100)
+  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
+  quantity   Int
+  lineTotal  Decimal  @map("line_total") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  orderId        String            @map("order_id") @db.Uuid
+  previousStatus OrderStatus?      @map("previous_status")
+  newStatus      OrderStatus       @map("new_status")
+  changedById    String?           @map("changed_by_id") @db.Uuid
+  changeSource   OrderChangeSource @map("change_source")
+  reasonCode     OrderReasonCode?  @map("reason_code")
+  reasonNote     String?           @map("reason_note") @db.VarChar(300)
+  changedAt      DateTime          @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([orderId, changedAt])
+  @@map("order_status_history")
+}
