@@ -82,9 +82,12 @@ List endpoints accept `page` (default 1) and `pageSize` (default 20, max 50) and
 
 ### Authentication
 
-- **Access token**: JWT, 15-minute lifetime, sent as `Authorization: Bearer <token>`. Payload: `sub` (user id), `role`.
+- **Access token**: JWT, 15-minute lifetime, sent as `Authorization: Bearer <token>`. Payload: `sub` (user id).
 - **Refresh token**: opaque random string, 7-day lifetime, sent only as an `httpOnly`, `Secure`, `SameSite=Strict` cookie named `refresh_token`, scoped to path `/api/v1/auth`. Stored hashed in the database and rotated on every use.
 - On every authenticated request the API checks the user still exists and is active.
+- An expired access token returns `401 ACCESS_TOKEN_EXPIRED`.
+  The frontend uses this code to trigger refresh-token rotation
+  and retries the original request once.
 
 ### Rate limiting
 
