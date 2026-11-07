@@ -6,6 +6,9 @@ import { errorHandler } from './middleware/error-handler.js';
 import { httpLogger } from './middleware/http-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import cookieParser from 'cookie-parser';
+import { authRouter, meRouter } from './modules/auth/auth.routes.js';
+
 
 export function createApp() {
   const app = express();
@@ -14,10 +17,12 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
 
   const api = Router();
   api.use('/health', healthRouter);
-  // Phase 4: api.use('/auth', authRouter), etc.
+  api.use('/auth', authRouter);
+  api.use('/me', meRouter);
 
   app.use('/api/v1', api);
 

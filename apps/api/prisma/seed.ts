@@ -1,4 +1,24 @@
 import { prisma } from '../src/lib/prisma.js';
+import { env } from '../src/config/env.js';
+import { hashPassword } from '../src/lib/password.js';
+
+const DEMO_PASSWORD = 'Password123';
+const demoUsers = [
+  { name: 'Admin User', email: 'admin@foodflow.local', role: 'ADMIN' },
+  { name: 'Kitchen Staff', email: 'staff@foodflow.local', role: 'STAFF' },
+  { name: 'Demo Customer', email: 'customer@foodflow.local', role: 'CUSTOMER' },
+] as const;
+
+async function seedUsers() {
+  if (env.NODE_ENV === 'production') return; // never create known passwords in production
+  for (const user of demoUsers) {
+    await prisma.user.upsert({
+      where: { emailNormalized: user.email },
+      update: {},
+      create: { ...user, emailNormalized: user.email, passwordHash: await hashPassword(DEMO_PASSWORD) },
+    });
+  }
+}
 
 const menu = [
   {
@@ -36,6 +56,7 @@ const menu = [
 ];
 
 async function main() {
+  await seedUsers();
   for (const group of menu) {
     const nameNormalized = group.category.trim().toLowerCase();
 
