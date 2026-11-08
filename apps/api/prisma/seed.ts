@@ -15,7 +15,11 @@ async function seedUsers() {
     await prisma.user.upsert({
       where: { emailNormalized: user.email },
       update: {},
-      create: { ...user, emailNormalized: user.email, passwordHash: await hashPassword(DEMO_PASSWORD) },
+      create: {
+        ...user,
+        emailNormalized: user.email,
+        passwordHash: await hashPassword(DEMO_PASSWORD),
+      },
     });
   }
 }
@@ -25,15 +29,27 @@ const menu = [
     category: 'Rice & Curry',
     description: 'Lunch favourites',
     items: [
-      { name: 'Chicken Rice & Curry', price: '850.00', description: 'Rice with chicken curry, dhal and two vegetables' },
-      { name: 'Vegetable Rice & Curry', price: '600.00', description: 'Rice with dhal and three vegetable curries' },
+      {
+        name: 'Chicken Rice & Curry',
+        price: '850.00',
+        description: 'Rice with chicken curry, dhal and two vegetables',
+      },
+      {
+        name: 'Vegetable Rice & Curry',
+        price: '600.00',
+        description: 'Rice with dhal and three vegetable curries',
+      },
     ],
   },
   {
     category: 'Kottu',
     description: 'Chopped roti specials',
     items: [
-      { name: 'Chicken Kottu', price: '1200.00', description: 'Chopped roti with chicken and vegetables' },
+      {
+        name: 'Chicken Kottu',
+        price: '1200.00',
+        description: 'Chopped roti with chicken and vegetables',
+      },
       { name: 'Cheese Kottu', price: '1400.00', description: 'Chicken kottu with melted cheese' },
     ],
   },
@@ -42,7 +58,11 @@ const menu = [
     description: 'Quick bites',
     items: [
       { name: 'Fish Roll', price: '150.00', description: 'Crumbed roll with spiced fish filling' },
-      { name: 'Vegetable Samosa', price: '120.00', description: 'Crispy pastry with spiced vegetables' },
+      {
+        name: 'Vegetable Samosa',
+        price: '120.00',
+        description: 'Crispy pastry with spiced vegetables',
+      },
     ],
   },
   {

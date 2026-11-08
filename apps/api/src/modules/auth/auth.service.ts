@@ -89,7 +89,11 @@ export const authService = {
 
     await prisma.$transaction(async (tx) => {
       const created = await refreshTokensRepository.create(
-        { userId: stored.userId, tokenHash: hashToken(newRefreshToken), expiresAt: refreshExpiry() },
+        {
+          userId: stored.userId,
+          tokenHash: hashToken(newRefreshToken),
+          expiresAt: refreshExpiry(),
+        },
         tx,
       );
       const rotated = await refreshTokensRepository.markReplaced(stored.id, created.id, tx);

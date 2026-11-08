@@ -1,12 +1,12 @@
-import type {User} from'../../generated/prisma/client.js'
+import type { User } from '../../generated/prisma/client.js';
 
 export function toPublicUser(user: User) {
-    return{
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-        createdAt: user.createdAt.toISOString(),
-    };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isActive: user.isActive,
+    createdAt: user.createdAt.toISOString(),
+  };
 }
