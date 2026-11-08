@@ -60,6 +60,7 @@ Every error response has the same shape:
 
 - `code` is a stable machine-readable string; the frontend switches on it.
 - `details` is present only for validation errors.
+- A request body that is not valid JSON returns `400 INVALID_JSON` on any endpoint, before validation runs.
 - `requestId` is also written to the logs (`X-Request-Id` response header).
 
 ### Pagination
@@ -406,6 +407,31 @@ Sets a new `refresh_token` cookie. The old token is marked replaced (`replaced_b
 ### GET /api/v1/categories (US-04)
 
 **Response 200:** array of active `Category` objects (not paginated; the list is small).
+
+### POST /api/v1/staff/categories (US-13)
+
+**Auth:** STAFF, ADMIN
+
+**Request body**
+
+```json
+{ "name": "Kottu", "description": "Chopped roti dishes" }
+```
+
+| Field       | Rules                                       |
+| ----------- | ------------------------------------------- |
+| name        | required, 2–100 chars, unique (ignore case) |
+| description | optional, max 500                           |
+
+**Response 201:** `Category`.
+
+**Errors:** 400 `VALIDATION_ERROR`, 401, 403, 409 `CATEGORY_ALREADY_EXISTS`: a category with this name already exists (compared case-insensitively, so `Drinks` and `DRINKS` clash).
+
+### PATCH /api/v1/staff/categories/{id} (US-13)
+
+Same fields as create, all optional, plus `isActive`.
+
+**Response 200:** `Category`. **Errors:** 400, 401, 403, 404 `CATEGORY_NOT_FOUND`, 409 `CATEGORY_ALREADY_EXISTS` when renaming to an existing name.
 
 ### POST /api/v1/staff/menu-items (US-13)
 
