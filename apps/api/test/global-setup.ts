@@ -1,8 +1,5 @@
 import { execSync } from 'node:child_process';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { TestProject } from 'vitest/node';
 
 let container: StartedPostgreSqlContainer | undefined;

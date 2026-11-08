@@ -21,7 +21,7 @@ A deploy can converge cleanly and still serve nothing: a loopback listener is un
 - Bind `0.0.0.0`. Compute routes external HTTP to the VM; a `localhost` or `127.0.0.1` listener looks started but is unreachable.
 
 ```ts
-Bun.serve({ port: service.port(), hostname: "0.0.0.0", fetch: handler });
+Bun.serve({ port: service.port(), hostname: '0.0.0.0', fetch: handler });
 ```
 
 ## 60 Seconds to First Byte
@@ -40,7 +40,7 @@ Idle instances scale to zero: the platform snapshots memory and resumes from it 
 `@prisma/compute` keeps an instance awake on a best-effort basis:
 
 ```ts
-import { KeepAwakeGuard, waitUntil } from "@prisma/compute";
+import { KeepAwakeGuard, waitUntil } from '@prisma/compute';
 
 waitUntil(processJob(job), { signal: AbortSignal.timeout(10 * 60_000) });
 
@@ -60,8 +60,8 @@ Scale to zero closes idle database connections. A long-lived client that treats 
 
 ```ts
 const sql = new SQL({ url: db.url, max: 1, idleTimeout: 10 });
-process.on("uncaughtException", (err) => console.error("uncaughtException", err));
-process.on("unhandledRejection", (err) => console.error("unhandledRejection", err));
+process.on('uncaughtException', (err) => console.error('uncaughtException', err));
+process.on('unhandledRejection', (err) => console.error('unhandledRejection', err));
 ```
 
 A call into a sleeping service can get `ECONNRESET` during the cold start; retry it. The generated Composer RPC client already does.
@@ -76,9 +76,9 @@ A call into a sleeping service can get `ECONNRESET` during the cold start; retry
 ## Bad
 
 ```ts
-app.post("/webhook", async (c) => {
+app.post('/webhook', async (c) => {
   await processForTwoMinutes(await c.req.json());
-  return c.text("done");
+  return c.text('done');
 });
 ```
 
@@ -87,7 +87,7 @@ The caller gets a `504` after 60 seconds, and the instance can sleep while the w
 ## Good
 
 ```ts
-app.post("/webhook", async (c) => {
+app.post('/webhook', async (c) => {
   const job = await c.req.json();
   waitUntil(processForTwoMinutes(job), { signal: AbortSignal.timeout(5 * 60_000) });
   return c.body(null, 202);

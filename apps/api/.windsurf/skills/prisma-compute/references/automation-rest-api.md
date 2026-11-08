@@ -12,28 +12,28 @@ Deploys now go through Composer, so low-level deploy clients from the earlier fl
 
 ## Choose the Surface
 
-| Goal | Use |
-|------|-----|
-| Deploy or tear down an app | `prisma deploy`, or `deploy`/`destroy` from `@prisma/composer/control` |
-| Deploy from GitHub | `prisma/cloud-deploy-action` ([`deploy-on-push.md`](deploy-on-push.md)) |
-| Read services, versions, builds, logs from your own tool | REST API |
+| Goal                                                       | Use                                                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Deploy or tear down an app                                 | `prisma deploy`, or `deploy`/`destroy` from `@prisma/composer/control`                    |
+| Deploy from GitHub                                         | `prisma/cloud-deploy-action` ([`deploy-on-push.md`](deploy-on-push.md))                   |
+| Read services, versions, builds, logs from your own tool   | REST API                                                                                  |
 | A coding agent with its own credential and approval policy | [Agent enrollment](https://www.prisma.io/docs/prisma-compute/agent-enrollment) (REST API) |
 
 ## REST API
 
 Base URL `https://api.prisma.io/v1`. The current OpenAPI document is at `https://api.prisma.io/v1/doc`; read it for exact payloads instead of copying shapes from memory. Authenticate with `Authorization: Bearer <workspace service token>` or an OAuth token. The Compute endpoints are marked experimental and can change.
 
-| Resource | Paths |
-|----------|-------|
-| Projects | `GET/POST /v1/projects`, `GET/PATCH/DELETE /v1/projects/{id}` |
-| Branches | `GET/POST /v1/projects/{projectId}/branches` (`gitName` filter), `GET/PATCH/DELETE /v1/branches/{branchId}` |
-| Services | `GET/POST /v1/services` (filter by `projectId`, `branchId`, `branchGitName`), `GET/PATCH/DELETE /v1/services/{serviceId}` |
+| Resource               | Paths                                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Projects               | `GET/POST /v1/projects`, `GET/PATCH/DELETE /v1/projects/{id}`                                                                                                                         |
+| Branches               | `GET/POST /v1/projects/{projectId}/branches` (`gitName` filter), `GET/PATCH/DELETE /v1/branches/{branchId}`                                                                           |
+| Services               | `GET/POST /v1/services` (filter by `projectId`, `branchId`, `branchGitName`), `GET/PATCH/DELETE /v1/services/{serviceId}`                                                             |
 | Versions (deployments) | `GET/POST /v1/services/{serviceId}/deployments`, `GET/DELETE /v1/deployments/{deploymentId}`, `POST /v1/deployments/{deploymentId}/start`, `POST /v1/deployments/{deploymentId}/stop` |
-| Promote and rollback | `POST /v1/services/{serviceId}/promote`, `POST /v1/services/{serviceId}/rollback` |
-| Logs | `GET /v1/deployments/{deploymentId}/logs` |
-| Builds | `GET/POST /v1/builds` (filter by `projectId`, `branchId`, `state`), `GET/PATCH /v1/builds/{buildId}` |
-| Domains | `GET/POST /v1/services/{serviceId}/domains`, `GET/DELETE /v1/domains/{domainId}`, `POST /v1/domains/{domainId}/retry` |
-| Environment variables | `GET/POST /v1/environment-variables` (filter by `projectId`, `class`, `key`, `branchId`), `GET/PATCH/DELETE /v1/environment-variables/{envVarId}` |
+| Promote and rollback   | `POST /v1/services/{serviceId}/promote`, `POST /v1/services/{serviceId}/rollback`                                                                                                     |
+| Logs                   | `GET /v1/deployments/{deploymentId}/logs`                                                                                                                                             |
+| Builds                 | `GET/POST /v1/builds` (filter by `projectId`, `branchId`, `state`), `GET/PATCH /v1/builds/{buildId}`                                                                                  |
+| Domains                | `GET/POST /v1/services/{serviceId}/domains`, `GET/DELETE /v1/domains/{domainId}`, `POST /v1/domains/{domainId}/retry`                                                                 |
+| Environment variables  | `GET/POST /v1/environment-variables` (filter by `projectId`, `class`, `key`, `branchId`), `GET/PATCH/DELETE /v1/environment-variables/{envVarId}`                                     |
 
 The `/v1/apps` paths (`/v1/apps`, `/v1/apps/{appId}/deployments`, `/promote`, `/rollback`, `/domains`) are deprecated. Use the `/v1/services` equivalents.
 
@@ -54,13 +54,13 @@ Environment variable values are write-only: no endpoint returns them. Do not log
 `@prisma/composer/control` runs the CLI's operations in-process and returns `{ ok: true, value }` or `{ ok: false, failure }` with a dotted `failure.code`:
 
 ```ts
-import { deploy } from "@prisma/composer/control";
-import prismaConfig from "./prisma.config.ts";
+import { deploy } from '@prisma/composer/control';
+import prismaConfig from './prisma.config.ts';
 
 const result = await deploy({
-  entry: "module.ts",
-  config: { value: prismaConfig.composer, file: "prisma.config.ts" },
-  stage: "pr-42",
+  entry: 'module.ts',
+  config: { value: prismaConfig.composer, file: 'prisma.config.ts' },
+  stage: 'pr-42',
 });
 if (!result.ok) throw new Error(`${result.failure.code}: ${result.failure.message}`);
 ```
@@ -77,12 +77,12 @@ if (!result.ok) throw new Error(`${result.failure.code}: ${result.failure.messag
 ## Bad
 
 ```ts
-import { ComputeClient, PreBuilt } from "@prisma/compute-sdk";
+import { ComputeClient, PreBuilt } from '@prisma/compute-sdk';
 
 await new ComputeClient(apiClient).deploy({
-  strategy: new PreBuilt({ appPath: "./dist", entrypoint: "index.js" }),
-  projectId: "proj_abc",
-  appName: "my-app",
+  strategy: new PreBuilt({ appPath: './dist', entrypoint: 'index.js' }),
+  projectId: 'proj_abc',
+  appName: 'my-app',
 });
 ```
 

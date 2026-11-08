@@ -4,7 +4,7 @@ description: Deprecated compatibility name for prisma-postgres-setup. Use only w
 license: MIT
 metadata:
   author: prisma
-  version: "8.0.0"
+  version: '8.0.0'
 ---
 
 # Deprecated: prisma-postgres

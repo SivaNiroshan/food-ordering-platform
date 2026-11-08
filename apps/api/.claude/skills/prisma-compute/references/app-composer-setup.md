@@ -28,47 +28,47 @@ npx prisma skills sync
 
 ```ts
 // src/server.ts
-import service from "./service.ts";
+import service from './service.ts';
 
 Bun.serve({
   port: service.port(),
-  hostname: "0.0.0.0",
-  fetch: () => new Response("ok"),
+  hostname: '0.0.0.0',
+  fetch: () => new Response('ok'),
 });
 ```
 
 ```ts
 // src/service.ts
-import node from "@prisma/composer/node";
-import { compute } from "@prisma/composer-prisma-cloud";
+import node from '@prisma/composer/node';
+import { compute } from '@prisma/composer-prisma-cloud';
 
 export default compute({
-  name: "web",
+  name: 'web',
   deps: {},
-  build: node({ module: import.meta.url, entry: "../dist/server.mjs" }),
+  build: node({ module: import.meta.url, entry: '../dist/server.mjs' }),
 });
 ```
 
 ```ts
 // module.ts
-import { module } from "@prisma/composer";
-import web from "./src/service.ts";
+import { module } from '@prisma/composer';
+import web from './src/service.ts';
 
-export default module("my-app", ({ provision }) => {
+export default module('my-app', ({ provision }) => {
   provision(web);
 });
 ```
 
 ```ts
 // prisma.config.ts
-import { defineConfig as composer } from "@prisma/composer/config";
-import { nodeBuild } from "@prisma/composer/node/control";
-import { prismaCloud, prismaState } from "@prisma/composer-prisma-cloud/control";
-import { definePrismaConfig } from "prisma/config";
+import { defineConfig as composer } from '@prisma/composer/config';
+import { nodeBuild } from '@prisma/composer/node/control';
+import { prismaCloud, prismaState } from '@prisma/composer-prisma-cloud/control';
+import { definePrismaConfig } from 'prisma/config';
 
 export default definePrismaConfig({
   composer: composer({
-    extensions: [prismaCloud({ region: "us-east-1" }), nodeBuild()],
+    extensions: [prismaCloud({ region: 'us-east-1' }), nodeBuild()],
     state: prismaState(),
   }),
 });
@@ -108,32 +108,32 @@ Declare the database as a dependency of the service and provision it in the modu
 
 ```ts
 // src/service.ts
-import node from "@prisma/composer/node";
-import { compute, rawPostgres } from "@prisma/composer-prisma-cloud";
+import node from '@prisma/composer/node';
+import { compute, rawPostgres } from '@prisma/composer-prisma-cloud';
 
 export default compute({
-  name: "api",
+  name: 'api',
   deps: { db: rawPostgres() },
-  build: node({ module: import.meta.url, entry: "../dist/server.mjs" }),
+  build: node({ module: import.meta.url, entry: '../dist/server.mjs' }),
 });
 ```
 
 ```ts
 // module.ts
-import { module } from "@prisma/composer";
-import { rawPostgres } from "@prisma/composer-prisma-cloud";
-import api from "./src/service.ts";
+import { module } from '@prisma/composer';
+import { rawPostgres } from '@prisma/composer-prisma-cloud';
+import api from './src/service.ts';
 
-export default module("my-app", ({ provision }) => {
-  const db = provision(rawPostgres({ name: "database" }));
+export default module('my-app', ({ provision }) => {
+  const db = provision(rawPostgres({ name: 'database' }));
   provision(api, { deps: { db } });
 });
 ```
 
 ```ts
 // src/server.ts
-import { SQL } from "bun";
-import service from "./service.ts";
+import { SQL } from 'bun';
+import service from './service.ts';
 
 const { db } = service.load();
 const sql = new SQL({ url: db.url, max: 1, idleTimeout: 10 });
@@ -152,16 +152,16 @@ Composer services do not read `process.env`. Declare the service's configuration
 
 ## Porting From `prisma.compute.ts`
 
-| `prisma.compute.ts` field | Composer equivalent |
-|---------------------------|---------------------|
-| `app.name` / `apps.<key>` | `compute({ name })`; the root module name is the project name |
-| `framework`, `build.command` | Your own `build` script, run before `deploy` |
-| `entry`, `build.outputDirectory`, `build.entrypoint` | `node({ module, entry })` or `node({ module, dir, entry })` pointing at built output, or `nextjs({ module, appDir })` |
-| `httpPort` | Removed. Listen on `service.port()` |
-| `env` file | Platform env vars through `project env add --file`, bound with `envParam`/`envSecret`; a database becomes a declared dependency |
-| `region` | `prismaCloud({ region })`, used only when the first deploy creates the project |
-| `apps` (monorepo) | One `compute()` per deployable app, all provisioned in one `module.ts` |
-| `--branch <name>` on deploy | `deploy --stage <name>` |
+| `prisma.compute.ts` field                            | Composer equivalent                                                                                                             |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `app.name` / `apps.<key>`                            | `compute({ name })`; the root module name is the project name                                                                   |
+| `framework`, `build.command`                         | Your own `build` script, run before `deploy`                                                                                    |
+| `entry`, `build.outputDirectory`, `build.entrypoint` | `node({ module, entry })` or `node({ module, dir, entry })` pointing at built output, or `nextjs({ module, appDir })`           |
+| `httpPort`                                           | Removed. Listen on `service.port()`                                                                                             |
+| `env` file                                           | Platform env vars through `project env add --file`, bound with `envParam`/`envSecret`; a database becomes a declared dependency |
+| `region`                                             | `prismaCloud({ region })`, used only when the first deploy creates the project                                                  |
+| `apps` (monorepo)                                    | One `compute()` per deployable app, all provisioned in one `module.ts`                                                          |
+| `--branch <name>` on deploy                          | `deploy --stage <name>`                                                                                                         |
 
 Then delete `prisma.compute.ts`, the `compute:deploy` script, and the `@prisma/compute-sdk` dev dependency if nothing else imports it. `.prisma/cli/state.json` from the old CLI is no longer used.
 
@@ -169,10 +169,10 @@ Then delete `prisma.compute.ts`, the `compute:deploy` script, and the `@prisma/c
 
 ```ts
 // prisma.compute.ts
-import { defineComputeConfig } from "@prisma/compute-sdk/config";
+import { defineComputeConfig } from '@prisma/compute-sdk/config';
 
 export default defineComputeConfig({
-  app: { framework: "hono", entry: "src/index.ts", httpPort: 8080 },
+  app: { framework: 'hono', entry: 'src/index.ts', httpPort: 8080 },
 });
 ```
 

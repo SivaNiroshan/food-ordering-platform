@@ -117,7 +117,10 @@ describe('POST /auth/refresh', () => {
 
   it('detects reuse of a rotated token and revokes every session', async () => {
     const { cookie: first } = await registerAndLogin();
-    const rotated = await request(app).post('/api/v1/auth/refresh').set('Cookie', first).expect(200);
+    const rotated = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', first)
+      .expect(200);
     const second = getRefreshCookie(rotated);
 
     const reuse = await request(app).post('/api/v1/auth/refresh').set('Cookie', first);
