@@ -9,6 +9,11 @@ const envSchema = z.object({
   CORS_ORIGIN: z.url().default('http://localhost:5173'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
+  ORDER_ACCEPTANCE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(15),
+  MINIMUM_ORDER_AMOUNT: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/)
+    .default('500.00'),
 });
 
 const parsed = envSchema.safeParse(process.env);

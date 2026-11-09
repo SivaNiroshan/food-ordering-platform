@@ -98,6 +98,17 @@ List endpoints accept `page` (default 1) and `pageSize` (default 20, max 50) and
 
 `POST /orders` requires an `Idempotency-Key: <uuid>` header (see section 5).
 
+### Configurable order rules
+
+Two order rules are set through environment variables, validated at startup:
+
+| Variable                           | Default  | Rules                                         | Effect                                                                                  |
+| ---------------------------------- | -------- | --------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `ORDER_ACCEPTANCE_TIMEOUT_MINUTES` | `15`     | positive integer                              | Sets `acceptanceDeadline`; unaccepted orders are auto-cancelled after this long (US-17) |
+| `MINIMUM_ORDER_AMOUNT`             | `500.00` | decimal string, max 2 decimal places (in LKR) | Orders with a lower subtotal fail with `400 MINIMUM_ORDER_NOT_MET`                      |
+
+The values used elsewhere in this document (15 minutes, LKR 500.00) are these defaults.
+
 ### Not in the API
 
 - **Cart**: stored in the frontend (Zustand + localStorage). The backend only validates items at checkout.
