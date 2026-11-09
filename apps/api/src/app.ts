@@ -8,6 +8,7 @@ import { requireRole } from './middleware/authorize.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { httpLogger } from './middleware/http-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
+import { adminUsersRouter } from './modules/admin/admin-users.routes.js';
 import { authRouter, meRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import {
@@ -47,6 +48,12 @@ export function createApp() {
   staff.use('/menu-items', staffMenuItemsRouter);
   staff.use('/orders', staffOrdersRouter);
   api.use('/staff', staff);
+
+  // Admin routes
+  const admin = Router();
+  admin.use(authenticate, requireRole('ADMIN'));
+  admin.use('/users', adminUsersRouter);
+  api.use('/admin', admin);
 
   app.use('/api/v1', api);
 
