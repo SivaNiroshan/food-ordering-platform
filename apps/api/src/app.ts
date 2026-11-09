@@ -16,6 +16,7 @@ import {
   staffCategoriesRouter,
   staffMenuItemsRouter,
 } from './modules/menu/menu.routes.js';
+import { customerOrdersRouter, staffOrdersRouter } from './modules/orders/orders.routes.js';
 
 export function createApp() {
   const app = express();
@@ -37,12 +38,14 @@ export function createApp() {
   api.use('/me', meRouter);
   api.use('/categories', publicCategoriesRouter);
   api.use('/menu-items', publicMenuItemsRouter);
+  api.use('/orders', customerOrdersRouter);
 
   // Staff routes: one authorization check for the whole group
   const staff = Router();
   staff.use(authenticate, requireRole('STAFF', 'ADMIN'));
   staff.use('/categories', staffCategoriesRouter);
   staff.use('/menu-items', staffMenuItemsRouter);
+  staff.use('/orders', staffOrdersRouter);
   api.use('/staff', staff);
 
   app.use('/api/v1', api);
