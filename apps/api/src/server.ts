@@ -1,12 +1,15 @@
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { env } from './config/env.js';
+import { orderJobs } from './jobs/queues.js';
 import { logger } from './lib/logger.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
+import { createSocketServer } from './realtime/socket.js';
 
 const app = createApp();
-const server = createServer(app); // Socket.IO will attach here in Phase 6
+const server = createServer(app);
+const sockets = createSocketServer(server);
 
 server.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'API listening');
@@ -25,9 +28,9 @@ function shutdown(signal: string) {
   }, 10_000);
   forceExit.unref();
 
-  server.close(async () => {
-    await prisma.$disconnect();
-    await redis.quit();
+  // io.close() also closes the HTTP server
+  void sockets.close().then(async () => {
+    await Promise.allSettled([prisma.$disconnect(), orderJobs.close(), redis.quit()]);
     clearTimeout(forceExit);
     logger.info('Shutdown complete');
     process.exit(0);

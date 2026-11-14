@@ -15,5 +15,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "prisma", "*.ts", "test"]
+  "include": ["src", "test", "prisma", "scripts", "*.ts"]
 }
