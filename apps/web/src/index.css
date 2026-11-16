@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+/*
+ * FoodFlow design tokens.
+ * Curry-leaf green carries the brand, turmeric marks "this needs your attention",
+ * chili is reserved for errors and destructive actions.
+ */
+@theme {
+  --color-leaf-50: #eef5f1;
+  --color-leaf-100: #d6e8de;
+  --color-leaf-600: #2c6b51;
+  --color-leaf-700: #1e4d3a;
+  --color-leaf-800: #173c2d;
+  --color-turmeric-100: #fbefd2;
+  --color-turmeric-400: #f0b93e;
+  --color-turmeric-500: #e8a317;
+  --color-turmeric-700: #8a5d06;
+  --color-chili-50: #fbeceb;
+  --color-chili-600: #b3261e;
+  --color-coconut: #fafaf6;
+  --color-ink: #1c1f1d;
+  --color-ash: #5f6662;
+  --color-line: #e3e5df;
+
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-coconut font-sans text-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight text-ink;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-turmeric-500);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
