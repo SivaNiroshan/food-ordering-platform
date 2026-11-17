@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { logout } from '../../features/auth/auth-api';
 import { useAuthStore } from '../../features/auth/auth-store';
+import { useCartStore } from '../../features/cart/cart-store';
 import { cn } from '../../lib/cn';
 import type { UserRole } from '../../lib/types';
 import { Button } from '../ui/Button';
@@ -27,7 +28,7 @@ const NAV_BY_ROLE: Record<UserRole | 'GUEST', NavItem[]> = {
 
 function navClass({ isActive }: { isActive: boolean }) {
   return cn(
-    'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+    'rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
     isActive ? 'bg-leaf-50 text-leaf-700' : 'text-ash hover:text-ink',
   );
 }
@@ -41,6 +42,8 @@ export function AppShell() {
   async function handleLogout() {
     setLoggingOut(true);
     await logout().catch(() => undefined);
+    // The cart is saved in this browser; don't leave it for the next person who logs in here.
+    useCartStore.getState().clear();
     setLoggingOut(false);
     navigate('/login');
   }
@@ -70,9 +73,10 @@ export function AppShell() {
                 <NavLink to="/login" className={navClass}>
                   Log in
                 </NavLink>
+                {/* On phones the register link lives on the login page, to keep the header on one line */}
                 <NavLink
                   to="/register"
-                  className="rounded-lg bg-leaf-700 px-3 py-2 text-sm font-medium text-white hover:bg-leaf-800"
+                  className="hidden rounded-lg bg-leaf-700 px-3 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-leaf-800 sm:inline-block"
                 >
                   Create account
                 </NavLink>

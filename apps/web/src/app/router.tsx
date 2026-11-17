@@ -4,6 +4,8 @@ import { NotFoundPage } from '../components/layout/NotFoundPage';
 import { PlaceholderPage } from '../components/layout/PlaceholderPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
+import { CartPage } from '../features/cart/CartPage';
+import { MenuPage } from '../features/menu/MenuPage';
 import { GuestOnly, HomeRedirect, RequireAuth } from '../features/auth/RequireAuth';
 
 export const router = createBrowserRouter([
@@ -28,7 +30,16 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       // The menu is public: anyone can browse; ordering needs an account.
-      { path: '/menu', element: <PlaceholderPage title="Menu" phase="5B" /> },
+      { path: '/menu', element: <MenuPage /> },
+      { path: '/cart', element: <CartPage /> },
+      {
+        path: '/checkout',
+        element: (
+          <RequireAuth roles={['CUSTOMER']}>
+            <PlaceholderPage title="Checkout" phase="5C" />
+          </RequireAuth>
+        ),
+      },
       {
         path: '/orders',
         element: (
