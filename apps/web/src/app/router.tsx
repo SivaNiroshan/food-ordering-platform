@@ -6,6 +6,9 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
 import { CartPage } from '../features/cart/CartPage';
 import { MenuPage } from '../features/menu/MenuPage';
+import { CheckoutPage } from '../features/orders/CheckoutPage';
+import { MyOrdersPage } from '../features/orders/MyOrdersPage';
+import { OrderDetailPage } from '../features/orders/OrderDetailPage';
 import { GuestOnly, HomeRedirect, RequireAuth } from '../features/auth/RequireAuth';
 
 export const router = createBrowserRouter([
@@ -36,7 +39,7 @@ export const router = createBrowserRouter([
         path: '/checkout',
         element: (
           <RequireAuth roles={['CUSTOMER']}>
-            <PlaceholderPage title="Checkout" phase="5C" />
+            <CheckoutPage />
           </RequireAuth>
         ),
       },
@@ -44,7 +47,15 @@ export const router = createBrowserRouter([
         path: '/orders',
         element: (
           <RequireAuth roles={['CUSTOMER']}>
-            <PlaceholderPage title="My orders" phase="5C" />
+            <MyOrdersPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: '/orders/:id',
+        element: (
+          <RequireAuth roles={['CUSTOMER']}>
+            <OrderDetailPage />
           </RequireAuth>
         ),
       },
