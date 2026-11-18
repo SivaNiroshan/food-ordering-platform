@@ -21,9 +21,13 @@ const NAV_BY_ROLE: Record<UserRole | 'GUEST', NavItem[]> = {
     { to: '/menu', label: 'Menu' },
     { to: '/orders', label: 'My orders' },
   ],
-  STAFF: [{ to: '/kitchen', label: 'Kitchen' }],
+  STAFF: [
+    { to: '/kitchen', label: 'Kitchen' },
+    { to: '/manage/menu', label: 'Manage menu' },
+  ],
   ADMIN: [
     { to: '/kitchen', label: 'Orders' },
+    { to: '/manage/menu', label: 'Manage menu' },
     { to: '/admin/users', label: 'Users' },
   ],
 };
@@ -56,20 +60,26 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-coconut/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
-          <Wordmark />
-          <nav aria-label="Main" className="flex items-center gap-1">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-4">
+          <Wordmark className="shrink-0" />
+          {/* Scrolls sideways on small phones instead of pushing the page wider */}
+          <nav aria-label="Main" className="flex min-w-0 items-center gap-1 overflow-x-auto">
             {items.map((item) => (
               <NavLink key={item.to} to={item.to} className={navClass}>
                 {item.label}
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {user ? (
               <>
                 <span className="hidden text-sm text-ash sm:inline">{user.name}</span>
-                <Button variant="ghost" onClick={handleLogout} loading={loggingOut}>
+                <Button
+                  variant="ghost"
+                  className="whitespace-nowrap"
+                  onClick={handleLogout}
+                  loading={loggingOut}
+                >
                   Log out
                 </Button>
               </>
