@@ -3,9 +3,11 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import { logout } from '../../features/auth/auth-api';
 import { useAuthStore } from '../../features/auth/auth-store';
 import { useCartStore } from '../../features/cart/cart-store';
+import { useRealtime } from '../../features/realtime/useRealtime';
 import { cn } from '../../lib/cn';
 import type { UserRole } from '../../lib/types';
 import { Button } from '../ui/Button';
+import { Toaster } from '../ui/Toaster';
 import { Wordmark } from './Wordmark';
 
 interface NavItem {
@@ -38,6 +40,9 @@ export function AppShell() {
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
   const items = NAV_BY_ROLE[user?.role ?? 'GUEST'];
+
+  // One live connection for the whole logged-in session (order updates, new orders).
+  useRealtime();
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -88,6 +93,7 @@ export function AppShell() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <Outlet />
       </main>
+      <Toaster />
     </div>
   );
 }
