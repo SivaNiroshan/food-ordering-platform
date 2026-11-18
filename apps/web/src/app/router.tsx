@@ -5,6 +5,7 @@ import { PlaceholderPage } from '../components/layout/PlaceholderPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
 import { CartPage } from '../features/cart/CartPage';
+import { KitchenPage } from '../features/kitchen/KitchenPage';
 import { MenuPage } from '../features/menu/MenuPage';
 import { CheckoutPage } from '../features/orders/CheckoutPage';
 import { MyOrdersPage } from '../features/orders/MyOrdersPage';
@@ -63,7 +64,7 @@ export const router = createBrowserRouter([
         path: '/kitchen',
         element: (
           <RequireAuth roles={['STAFF', 'ADMIN']}>
-            <PlaceholderPage title="Kitchen" phase="5D" />
+            <KitchenPage />
           </RequireAuth>
         ),
       },
