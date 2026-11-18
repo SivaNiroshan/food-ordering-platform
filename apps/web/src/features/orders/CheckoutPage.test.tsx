@@ -1,3 +1,4 @@
+import { onlineManager } from '@tanstack/react-query';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,7 +24,10 @@ beforeEach(() => {
   useCartStore.getState().add({ id: 'milo', name: 'Iced Milo', price: '450.00' });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  onlineManager.setOnline(true);
+});
 
 describe('CheckoutPage', () => {
   it('places the order with an Idempotency-Key, clears the cart and opens the order', async () => {
@@ -70,7 +74,20 @@ describe('CheckoutPage', () => {
     const secondKey = headerOf(fetchMock.mock.calls[1], 'Idempotency-Key');
     expect(secondKey).toBe(firstKey);
   });
+  it('shows the message straight away when the browser is offline, instead of waiting', async () => {
+    onlineManager.setOnline(false); // what React Query sees when DevTools is set to Offline
+    const fetchMock = mockFetch((url) => {
+      if (url.pathname === '/api/v1/orders') throw new TypeError('Failed to fetch');
+      return undefined;
+    });
+    renderPage(<CheckoutPage />, { path: '/checkout' });
 
+    await userEvent.click(screen.getByRole('button', { name: 'Place order' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('can’t tell whether your order');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Place order' })).toBeEnabled();
+  });
   it('uses a new key when the order changes between attempts', async () => {
     const fetchMock = mockFetch((url) =>
       url.pathname === '/api/v1/orders'
