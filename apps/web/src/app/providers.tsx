@@ -13,6 +13,12 @@ export const queryClient = new QueryClient({
         !(error instanceof ApiError && error.status >= 400 && error.status < 500) &&
         failureCount < 1,
     },
+    mutations: {
+      // React Query's default ("online") PAUSES a mutation while the browser is offline and
+      // sends it later by itself. For actions like placing or cancelling an order, the user
+      // should decide when to retry, so we send the request anyway and show the error at once.
+      networkMode: 'always',
+    },
   },
 });
 

@@ -20,6 +20,10 @@ export interface PlaceOrderInput {
 export function usePlaceOrder() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Never queue an order while offline: fail now, so the customer sees the message and
+    // chooses to retry (with the same Idempotency-Key). Set here as well as in the app's
+    // defaults, because this is the one action where a silent delayed send matters most.
+    networkMode: 'always',
     mutationFn: ({ items, notes, idempotencyKey }: PlaceOrderInput) =>
       apiRequest<Order>('/orders', {
         method: 'POST',
