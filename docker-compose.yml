@@ -1,3 +1,20 @@
+# Development (unchanged):   docker compose up -d                 → only Postgres + Redis
+# Whole app in containers:    docker compose --profile app up --build -d   → http://localhost:8080
+# Demo data (once):           docker compose run --rm seed
+
+x-api-env: &api-env
+  NODE_ENV: production
+  PORT: 4000
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  REDIS_URL: redis://redis:6379
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env}
+  CORS_ORIGIN: http://localhost:8080
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-5}
+  ORDER_ACCEPTANCE_TIMEOUT_MINUTES: ${ORDER_ACCEPTANCE_TIMEOUT_MINUTES:-15}
+  # nginx sits in front of the API, so client IPs come from X-Forwarded-For.
+  TRUST_PROXY: 'true'
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -27,6 +44,91 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Applies pending migrations, then exits. api and worker wait for it to succeed.
+  migrate:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    image: foodflow-api-build
+    working_dir: /app/apps/api
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Demo accounts and menu. Run once: docker compose run --rm seed
+  seed:
+    profiles: ['seed']
+    image: foodflow-api-build
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    working_dir: /app/apps/api
+    command: ['npx', 'prisma', 'db', 'seed']
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    image: foodflow-api
+    environment: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4000/api/v1/categories').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  # Same image as the api, different entry point: runs the BullMQ jobs (auto-cancel).
+  worker:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    image: foodflow-api
+    command: ['node', 'dist/worker.js']
+    environment: *api-env
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: foodflow-web
+    ports:
+      - '8080:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

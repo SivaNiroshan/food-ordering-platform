@@ -132,7 +132,7 @@ describe('CheckoutPage', () => {
     expect(useCartStore.getState().lines.map((l) => l.menuItemId)).toEqual(['kottu']);
   });
 
-    it('still explains why when every item sold out and the order is now empty', async () => {
+  it('still explains why when every item sold out and the order is now empty', async () => {
     mockFetch((url) =>
       url.pathname === '/api/v1/orders'
         ? {

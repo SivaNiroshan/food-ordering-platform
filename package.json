@@ -12,7 +12,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "docker:up": "docker compose --profile app up --build -d",
+    "docker:down": "docker compose --profile app down",
+    "docker:logs": "docker compose --profile app logs -f api worker",
+    "docker:seed": "docker compose run --rm seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,0 +1,15 @@
+# Keep the build context small, and never send secrets or local builds into an image.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+.vscode
+coverage
+test-results
+playwright-report
+e2e
+apps/api/src/generated
+*.log

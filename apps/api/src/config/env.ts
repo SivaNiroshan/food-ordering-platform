@@ -16,6 +16,10 @@ const envSchema = z.object({
     .string()
     .regex(/^\d+(\.\d{1,2})?$/)
     .default('500.00'),
+  // True when a reverse proxy (nginx in Docker, or the hosting platform) is in front of the
+  // API. Then req.ip comes from X-Forwarded-For, so rate limits are per user, not per proxy.
+  // Leave false otherwise: anyone could fake that header and dodge the rate limit.
+  TRUST_PROXY: z.stringbool().default(false),
 });
 
 const parsed = envSchema.safeParse(process.env);

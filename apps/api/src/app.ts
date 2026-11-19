@@ -22,6 +22,10 @@ import { customerOrdersRouter, staffOrdersRouter } from './modules/orders/orders
 export function createApp() {
   const app = express();
 
+  // Behind nginx (Docker) or a hosting proxy: read the real client IP from X-Forwarded-For,
+  // otherwise every user shares the proxy's IP and therefore one rate-limit bucket.
+  if (env.TRUST_PROXY) app.set('trust proxy', 1);
+
   // Behind a reverse proxy in production: trust its X-Forwarded-For so rate limiting sees real IPs.
   if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
