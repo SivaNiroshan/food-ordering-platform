@@ -1,0 +1,2283 @@
+
+===== docker-compose.yml
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
+===== package.json
+{
+  "name": "foodflow",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^24.19.2",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.0"
+  }
+}
+===== apps/api/package.json
+{
+  "name": "@foodflow/api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
+    "dev:worker": "tsx watch --env-file=../../.env src/worker.ts",
+    "start:worker": "node dist/worker.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@socket.io/redis-emitter": "^5.1.0",
+    "bcrypt": "^6.0.0",
+    "bullmq": "^6.7.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.13",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "rate-limit-redis": "^6.0.1",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "dotenv": "^18.0.9",
+    "pino-pretty": "^13.2.0",
+    "prisma": "^7.10.1",
+    "socket.io-client": "^4.8.4",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.5"
+  }
+}
+===== apps/api/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // "rootDir": "src",
+    // "outDir": "dist",
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test", "prisma", "scripts", "*.ts"]
+}
+===== apps/api/.env.example
+(missing)
+===== apps/api/prisma.config.ts
+(missing)
+===== apps/api/prisma/schema.prisma
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PAY_ON_COLLECTION
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum OrderChangeSource {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+enum OrderReasonCode {
+  CUSTOMER_REQUEST
+  ITEM_UNAVAILABLE
+  KITCHEN_BUSY
+  RESTAURANT_CLOSING
+  ACCEPTANCE_TIMEOUT
+  OTHER
+}
+
+// ---------- Users & auth ----------
+
+model User {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  name            String   @db.VarChar(100)
+  email           String   @db.VarChar(255)
+  emailNormalized String   @unique @map("email_normalized") @db.VarChar(255)
+  passwordHash    String   @map("password_hash")
+  role            UserRole @default(CUSTOMER)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders        Order[]
+  refreshTokens RefreshToken[]
+  statusChanges OrderStatusHistory[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  replacedByTokenId String?   @unique @map("replaced_by_token_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedByTokenId], references: [id], onDelete: Restrict)
+  replaces   RefreshToken? @relation("TokenRotation")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ---------- Menu ----------
+
+model Category {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  name           String   @db.VarChar(100)
+  nameNormalized String   @unique @map("name_normalized") @db.VarChar(100)
+  description    String?  @db.VarChar(500)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  menuItems MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?  @map("image_url") @db.VarChar(2048)
+  isAvailable Boolean  @default(true) @map("is_available")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+// ---------- Orders ----------
+
+model Order {
+  id                 String        @id @default(uuid(7)) @db.Uuid
+  customerId         String        @map("customer_id") @db.Uuid
+  status             OrderStatus   @default(PENDING)
+  paymentMethod      PaymentMethod @default(PAY_ON_COLLECTION) @map("payment_method")
+  paymentStatus      PaymentStatus @default(UNPAID) @map("payment_status")
+  subtotal           Decimal       @db.Decimal(10, 2)
+  notes              String?       @db.VarChar(300)
+  acceptanceDeadline DateTime      @map("acceptance_deadline") @db.Timestamptz(6)
+  idempotencyKey     String        @map("idempotency_key") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer      User                 @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([status, acceptanceDeadline])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  menuItemId String   @map("menu_item_id") @db.Uuid
+  itemName   String   @map("item_name") @db.VarChar(100)
+  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
+  quantity   Int
+  lineTotal  Decimal  @map("line_total") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  orderId        String            @map("order_id") @db.Uuid
+  previousStatus OrderStatus?      @map("previous_status")
+  newStatus      OrderStatus       @map("new_status")
+  changedById    String?           @map("changed_by_id") @db.Uuid
+  changeSource   OrderChangeSource @map("change_source")
+  reasonCode     OrderReasonCode?  @map("reason_code")
+  reasonNote     String?           @map("reason_note") @db.VarChar(300)
+  changedAt      DateTime          @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([orderId, changedAt])
+  @@map("order_status_history")
+}
+===== apps/api/src file list
+.\apps\api\src\app.test.ts
+.\apps\api\src\app.ts
+.\apps\api\src\server.ts
+.\apps\api\src\worker.ts
+.\apps\api\src\config\env.ts
+.\apps\api\src\generated\prisma\browser.ts
+.\apps\api\src\generated\prisma\client.ts
+.\apps\api\src\generated\prisma\commonInputTypes.ts
+.\apps\api\src\generated\prisma\enums.ts
+.\apps\api\src\generated\prisma\models.ts
+.\apps\api\src\generated\prisma\internal\class.ts
+.\apps\api\src\generated\prisma\internal\prismaNamespace.ts
+.\apps\api\src\generated\prisma\internal\prismaNamespaceBrowser.ts
+.\apps\api\src\generated\prisma\models\Category.ts
+.\apps\api\src\generated\prisma\models\MenuItem.ts
+.\apps\api\src\generated\prisma\models\Order.ts
+.\apps\api\src\generated\prisma\models\OrderItem.ts
+.\apps\api\src\generated\prisma\models\OrderStatusHistory.ts
+.\apps\api\src\generated\prisma\models\RefreshToken.ts
+.\apps\api\src\generated\prisma\models\User.ts
+.\apps\api\src\jobs\queues.ts
+.\apps\api\src\lib\cache.ts
+.\apps\api\src\lib\errors.ts
+.\apps\api\src\lib\logger.ts
+.\apps\api\src\lib\pagination.ts
+.\apps\api\src\lib\password.ts
+.\apps\api\src\lib\prisma-errors.ts
+.\apps\api\src\lib\prisma.ts
+.\apps\api\src\lib\redis.ts
+.\apps\api\src\lib\tokens.ts
+.\apps\api\src\lib\validation.ts
+.\apps\api\src\middleware\authenticate.ts
+.\apps\api\src\middleware\authorize.ts
+.\apps\api\src\middleware\error-handler.ts
+.\apps\api\src\middleware\http-logger.ts
+.\apps\api\src\middleware\not-found.ts
+.\apps\api\src\middleware\rate-limit.ts
+.\apps\api\src\modules\admin\admin-users.controller.ts
+.\apps\api\src\modules\admin\admin-users.int.test.ts
+.\apps\api\src\modules\admin\admin-users.routes.ts
+.\apps\api\src\modules\admin\admin-users.schemas.ts
+.\apps\api\src\modules\admin\admin-users.service.ts
+.\apps\api\src\modules\auth\auth.controller.ts
+.\apps\api\src\modules\auth\auth.int.test.ts
+.\apps\api\src\modules\auth\auth.repository.ts
+.\apps\api\src\modules\auth\auth.routes.ts
+.\apps\api\src\modules\auth\auth.schemas.ts
+.\apps\api\src\modules\auth\auth.service.ts
+.\apps\api\src\modules\health\health.routes.ts
+.\apps\api\src\modules\menu\menu.controller.ts
+.\apps\api\src\modules\menu\menu.int.test.ts
+.\apps\api\src\modules\menu\menu.mapper.ts
+.\apps\api\src\modules\menu\menu.repository.ts
+.\apps\api\src\modules\menu\menu.routes.ts
+.\apps\api\src\modules\menu\menu.schemas.ts
+.\apps\api\src\modules\menu\menu.service.ts
+.\apps\api\src\modules\orders\orders.controller.ts
+.\apps\api\src\modules\orders\orders.int.test.ts
+.\apps\api\src\modules\orders\orders.mapper.ts
+.\apps\api\src\modules\orders\orders.repository.ts
+.\apps\api\src\modules\orders\orders.routes.ts
+.\apps\api\src\modules\orders\orders.schemas.ts
+.\apps\api\src\modules\orders\orders.service.ts
+.\apps\api\src\modules\orders\orders.state-machine.test.ts
+.\apps\api\src\modules\orders\orders.state-machine.ts
+.\apps\api\src\modules\users\users.mapper.ts
+.\apps\api\src\modules\users\users.repository.ts
+.\apps\api\src\realtime\events.ts
+.\apps\api\src\realtime\socket.ts
+.\apps\api\src\types\express.d.ts
+===== D:\My Projects\food-ordering-platform\apps\api\src\config\env.ts
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(4000),
+  DATABASE_URL: z.url(),
+  REDIS_URL: z.url(),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  CORS_ORIGIN: z.url().default('http://localhost:5173'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
+  // Login/register attempts per IP per minute. Raise it locally for the E2E tests.
+  AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(5),
+  ORDER_ACCEPTANCE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(15),
+  MINIMUM_ORDER_AMOUNT: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/)
+    .default('500.00'),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('❌ Invalid environment variables:\n' + z.prettifyError(parsed.error));
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;
+===== D:\My Projects\food-ordering-platform\apps\api\src\generated\prisma\internal\class.ts
+
+/* !!! This is code generated by Prisma. Do not edit directly. !!! */
+/* eslint-disable */
+// biome-ignore-all lint: generated file
+// @ts-nocheck 
+/*
+ * WARNING: This is an internal file that is subject to change!
+ *
+ * 🛑 Under no circumstances should you import this file directly! 🛑
+ *
+ * Please import the `PrismaClient` class from the `client.ts` file instead.
+ */
+
+import * as runtime from "@prisma/client/runtime/client"
+import type * as Prisma from "./prismaNamespace.js"
+
+
+const config: runtime.GetPrismaClientConfig = {
+  "previewFeatures": [],
+  "clientVersion": "7.10.1",
+  "engineVersion": "d1b3f377ca835d73fd50954a5e22128b9ebdd6b8",
+  "activeProvider": "postgresql",
+  "inlineSchema": "generator client {\n  provider            = \"prisma-client\"\n  output              = \"../src/generated/prisma\"\n  moduleFormat        = \"esm\"\n  importFileExtension = \"js\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\n// ---------- Enums ----------\n\nenum UserRole {\n  CUSTOMER\n  STAFF\n  ADMIN\n}\n\nenum OrderStatus {\n  PENDING\n  ACCEPTED\n  REJECTED\n  PREPARING\n  READY\n  COMPLETED\n  CANCELLED\n}\n\nenum PaymentMethod {\n  PAY_ON_COLLECTION\n}\n\nenum PaymentStatus {\n  UNPAID\n  PAID\n}\n\nenum OrderChangeSource {\n  CUSTOMER\n  STAFF\n  SYSTEM\n}\n\nenum OrderReasonCode {\n  CUSTOMER_REQUEST\n  ITEM_UNAVAILABLE\n  KITCHEN_BUSY\n  RESTAURANT_CLOSING\n  ACCEPTANCE_TIMEOUT\n  OTHER\n}\n\n// ---------- Users & auth ----------\n\nmodel User {\n  id              String   @id @default(uuid(7)) @db.Uuid\n  name            String   @db.VarChar(100)\n  email           String   @db.VarChar(255)\n  emailNormalized String   @unique @map(\"email_normalized\") @db.VarChar(255)\n  passwordHash    String   @map(\"password_hash\")\n  role            UserRole @default(CUSTOMER)\n  isActive        Boolean  @default(true) @map(\"is_active\")\n  createdAt       DateTime @default(now()) @map(\"created_at\") @db.Timestamptz(6)\n  updatedAt       DateTime @updatedAt @map(\"updated_at\") @db.Timestamptz(6)\n\n  orders        Order[]\n  refreshTokens RefreshToken[]\n  statusChanges OrderStatusHistory[]\n\n  @@map(\"users\")\n}\n\nmodel RefreshToken {\n  id                String    @id @default(uuid(7)) @db.Uuid\n  userId            String    @map(\"user_id\") @db.Uuid\n  tokenHash         String    @unique @map(\"token_hash\") @db.VarChar(255)\n  expiresAt         DateTime  @map(\"expires_at\") @db.Timestamptz(6)\n  revokedAt         DateTime? @map(\"revoked_at\") @db.Timestamptz(6)\n  replacedByTokenId String?   @unique @map(\"replaced_by_token_id\") @db.Uuid\n  createdAt         DateTime  @default(now()) @map(\"created_at\") @db.Timestamptz(6)\n\n  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)\n  replacedBy RefreshToken? @relation(\"TokenRotation\", fields: [replacedByTokenId], references: [id], onDelete: Restrict)\n  replaces   RefreshToken? @relation(\"TokenRotation\")\n\n  @@index([userId])\n  @@map(\"refresh_tokens\")\n}\n\n// ---------- Menu ----------\n\nmodel Category {\n  id             String   @id @default(uuid(7)) @db.Uuid\n  name           String   @db.VarChar(100)\n  nameNormalized String   @unique @map(\"name_normalized\") @db.VarChar(100)\n  description    String?  @db.VarChar(500)\n  isActive       Boolean  @default(true) @map(\"is_active\")\n  createdAt      DateTime @default(now()) @map(\"created_at\") @db.Timestamptz(6)\n  updatedAt      DateTime @updatedAt @map(\"updated_at\") @db.Timestamptz(6)\n\n  menuItems MenuItem[]\n\n  @@map(\"categories\")\n}\n\nmodel MenuItem {\n  id          String   @id @default(uuid(7)) @db.Uuid\n  categoryId  String   @map(\"category_id\") @db.Uuid\n  name        String   @db.VarChar(100)\n  description String?  @db.VarChar(500)\n  price       Decimal  @db.Decimal(10, 2)\n  imageUrl    String?  @map(\"image_url\") @db.VarChar(2048)\n  isAvailable Boolean  @default(true) @map(\"is_available\")\n  isActive    Boolean  @default(true) @map(\"is_active\")\n  createdAt   DateTime @default(now()) @map(\"created_at\") @db.Timestamptz(6)\n  updatedAt   DateTime @updatedAt @map(\"updated_at\") @db.Timestamptz(6)\n\n  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)\n  orderItems OrderItem[]\n\n  @@index([categoryId])\n  @@map(\"menu_items\")\n}\n\n// ---------- Orders ----------\n\nmodel Order {\n  id                 String        @id @default(uuid(7)) @db.Uuid\n  customerId         String        @map(\"customer_id\") @db.Uuid\n  status             OrderStatus   @default(PENDING)\n  paymentMethod      PaymentMethod @default(PAY_ON_COLLECTION) @map(\"payment_method\")\n  paymentStatus      PaymentStatus @default(UNPAID) @map(\"payment_status\")\n  subtotal           Decimal       @db.Decimal(10, 2)\n  notes              String?       @db.VarChar(300)\n  acceptanceDeadline DateTime      @map(\"acceptance_deadline\") @db.Timestamptz(6)\n  idempotencyKey     String        @map(\"idempotency_key\") @db.Uuid\n  createdAt          DateTime      @default(now()) @map(\"created_at\") @db.Timestamptz(6)\n  updatedAt          DateTime      @updatedAt @map(\"updated_at\") @db.Timestamptz(6)\n\n  customer      User                 @relation(fields: [customerId], references: [id], onDelete: Restrict)\n  items         OrderItem[]\n  statusHistory OrderStatusHistory[]\n\n  @@unique([customerId, idempotencyKey])\n  @@index([customerId, createdAt(sort: Desc)])\n  @@index([status, createdAt])\n  @@index([status, acceptanceDeadline])\n  @@map(\"orders\")\n}\n\nmodel OrderItem {\n  id         String   @id @default(uuid(7)) @db.Uuid\n  orderId    String   @map(\"order_id\") @db.Uuid\n  menuItemId String   @map(\"menu_item_id\") @db.Uuid\n  itemName   String   @map(\"item_name\") @db.VarChar(100)\n  unitPrice  Decimal  @map(\"unit_price\") @db.Decimal(10, 2)\n  quantity   Int\n  lineTotal  Decimal  @map(\"line_total\") @db.Decimal(10, 2)\n  createdAt  DateTime @default(now()) @map(\"created_at\") @db.Timestamptz(6)\n\n  order    Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)\n  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)\n\n  @@index([orderId])\n  @@index([menuItemId])\n  @@map(\"order_items\")\n}\n\nmodel OrderStatusHistory {\n  id             String            @id @default(uuid(7)) @db.Uuid\n  orderId        String            @map(\"order_id\") @db.Uuid\n  previousStatus OrderStatus?      @map(\"previous_status\")\n  newStatus      OrderStatus       @map(\"new_status\")\n  changedById    String?           @map(\"changed_by_id\") @db.Uuid\n  changeSource   OrderChangeSource @map(\"change_source\")\n  reasonCode     OrderReasonCode?  @map(\"reason_code\")\n  reasonNote     String?           @map(\"reason_note\") @db.VarChar(300)\n  changedAt      DateTime          @default(now()) @map(\"changed_at\") @db.Timestamptz(6)\n\n  order     Order @relation(fields: [orderId], references: [id], onDelete: Restrict)\n  changedBy User? @relation(fields: [changedById], references: [id], onDelete: Restrict)\n\n  @@index([orderId, changedAt])\n  @@map(\"order_status_history\")\n}\n",
+  "runtimeDataModel": {
+    "models": {},
+    "enums": {},
+    "types": {}
+  },
+  "parameterizationSchema": {
+    "strings": [],
+    "graph": ""
+  }
+}
+
+config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"emailNormalized\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"email_normalized\"},{\"name\":\"passwordHash\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"password_hash\"},{\"name\":\"role\",\"kind\":\"enum\",\"type\":\"UserRole\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\",\"dbName\":\"is_active\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"created_at\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"updated_at\"},{\"name\":\"orders\",\"kind\":\"object\",\"type\":\"Order\",\"relationName\":\"OrderToUser\"},{\"name\":\"refreshTokens\",\"kind\":\"object\",\"type\":\"RefreshToken\",\"relationName\":\"RefreshTokenToUser\"},{\"name\":\"statusChanges\",\"kind\":\"object\",\"type\":\"OrderStatusHistory\",\"relationName\":\"OrderStatusHistoryToUser\"}],\"dbName\":\"users\",\"schema\":null},\"RefreshToken\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"user_id\"},{\"name\":\"tokenHash\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"token_hash\"},{\"name\":\"expiresAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"expires_at\"},{\"name\":\"revokedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"revoked_at\"},{\"name\":\"replacedByTokenId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"replaced_by_token_id\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"created_at\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"RefreshTokenToUser\"},{\"name\":\"replacedBy\",\"kind\":\"object\",\"type\":\"RefreshToken\",\"relationName\":\"TokenRotation\"},{\"name\":\"replaces\",\"kind\":\"object\",\"type\":\"RefreshToken\",\"relationName\":\"TokenRotation\"}],\"dbName\":\"refresh_tokens\",\"schema\":null},\"Category\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"nameNormalized\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"name_normalized\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\",\"dbName\":\"is_active\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"created_at\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"updated_at\"},{\"name\":\"menuItems\",\"kind\":\"object\",\"type\":\"MenuItem\",\"relationName\":\"CategoryToMenuItem\"}],\"dbName\":\"categories\",\"schema\":null},\"MenuItem\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"categoryId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"category_id\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"price\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"imageUrl\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"image_url\"},{\"name\":\"isAvailable\",\"kind\":\"scalar\",\"type\":\"Boolean\",\"dbName\":\"is_available\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\",\"dbName\":\"is_active\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"created_at\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"updated_at\"},{\"name\":\"category\",\"kind\":\"object\",\"type\":\"Category\",\"relationName\":\"CategoryToMenuItem\"},{\"name\":\"orderItems\",\"kind\":\"object\",\"type\":\"OrderItem\",\"relationName\":\"MenuItemToOrderItem\"}],\"dbName\":\"menu_items\",\"schema\":null},\"Order\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"customerId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"customer_id\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"OrderStatus\"},{\"name\":\"paymentMethod\",\"kind\":\"enum\",\"type\":\"PaymentMethod\",\"dbName\":\"payment_method\"},{\"name\":\"paymentStatus\",\"kind\":\"enum\",\"type\":\"PaymentStatus\",\"dbName\":\"payment_status\"},{\"name\":\"subtotal\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"notes\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"acceptanceDeadline\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"acceptance_deadline\"},{\"name\":\"idempotencyKey\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"idempotency_key\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"created_at\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"updated_at\"},{\"name\":\"customer\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"OrderToUser\"},{\"name\":\"items\",\"kind\":\"object\",\"type\":\"OrderItem\",\"relationName\":\"OrderToOrderItem\"},{\"name\":\"statusHistory\",\"kind\":\"object\",\"type\":\"OrderStatusHistory\",\"relationName\":\"OrderToOrderStatusHistory\"}],\"dbName\":\"orders\",\"schema\":null},\"OrderItem\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"orderId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"order_id\"},{\"name\":\"menuItemId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"menu_item_id\"},{\"name\":\"itemName\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"item_name\"},{\"name\":\"unitPrice\",\"kind\":\"scalar\",\"type\":\"Decimal\",\"dbName\":\"unit_price\"},{\"name\":\"quantity\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"lineTotal\",\"kind\":\"scalar\",\"type\":\"Decimal\",\"dbName\":\"line_total\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"created_at\"},{\"name\":\"order\",\"kind\":\"object\",\"type\":\"Order\",\"relationName\":\"OrderToOrderItem\"},{\"name\":\"menuItem\",\"kind\":\"object\",\"type\":\"MenuItem\",\"relationName\":\"MenuItemToOrderItem\"}],\"dbName\":\"order_items\",\"schema\":null},\"OrderStatusHistory\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"orderId\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"order_id\"},{\"name\":\"previousStatus\",\"kind\":\"enum\",\"type\":\"OrderStatus\",\"dbName\":\"previous_status\"},{\"name\":\"newStatus\",\"kind\":\"enum\",\"type\":\"OrderStatus\",\"dbName\":\"new_status\"},{\"name\":\"changedById\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"changed_by_id\"},{\"name\":\"changeSource\",\"kind\":\"enum\",\"type\":\"OrderChangeSource\",\"dbName\":\"change_source\"},{\"name\":\"reasonCode\",\"kind\":\"enum\",\"type\":\"OrderReasonCode\",\"dbName\":\"reason_code\"},{\"name\":\"reasonNote\",\"kind\":\"scalar\",\"type\":\"String\",\"dbName\":\"reason_note\"},{\"name\":\"changedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\",\"dbName\":\"changed_at\"},{\"name\":\"order\",\"kind\":\"object\",\"type\":\"Order\",\"relationName\":\"OrderToOrderStatusHistory\"},{\"name\":\"changedBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"OrderStatusHistoryToUser\"}],\"dbName\":\"order_status_history\",\"schema\":null}},\"enums\":{},\"types\":{}}")
+config.parameterizationSchema = {
+  strings: JSON.parse("[\"where\",\"orderBy\",\"cursor\",\"customer\",\"order\",\"menuItems\",\"_count\",\"category\",\"orderItems\",\"menuItem\",\"items\",\"changedBy\",\"statusHistory\",\"orders\",\"user\",\"replacedBy\",\"replaces\",\"refreshTokens\",\"statusChanges\",\"User.findUnique\",\"User.findUniqueOrThrow\",\"User.findFirst\",\"User.findFirstOrThrow\",\"User.findMany\",\"data\",\"User.createOne\",\"User.createMany\",\"User.createManyAndReturn\",\"User.updateOne\",\"User.updateMany\",\"User.updateManyAndReturn\",\"create\",\"update\",\"User.upsertOne\",\"User.deleteOne\",\"User.deleteMany\",\"having\",\"_min\",\"_max\",\"User.groupBy\",\"User.aggregate\",\"RefreshToken.findUnique\",\"RefreshToken.findUniqueOrThrow\",\"RefreshToken.findFirst\",\"RefreshToken.findFirstOrThrow\",\"RefreshToken.findMany\",\"RefreshToken.createOne\",\"RefreshToken.createMany\",\"RefreshToken.createManyAndReturn\",\"RefreshToken.updateOne\",\"RefreshToken.updateMany\",\"RefreshToken.updateManyAndReturn\",\"RefreshToken.upsertOne\",\"RefreshToken.deleteOne\",\"RefreshToken.deleteMany\",\"RefreshToken.groupBy\",\"RefreshToken.aggregate\",\"Category.findUnique\",\"Category.findUniqueOrThrow\",\"Category.findFirst\",\"Category.findFirstOrThrow\",\"Category.findMany\",\"Category.createOne\",\"Category.createMany\",\"Category.createManyAndReturn\",\"Category.updateOne\",\"Category.updateMany\",\"Category.updateManyAndReturn\",\"Category.upsertOne\",\"Category.deleteOne\",\"Category.deleteMany\",\"Category.groupBy\",\"Category.aggregate\",\"MenuItem.findUnique\",\"MenuItem.findUniqueOrThrow\",\"MenuItem.findFirst\",\"MenuItem.findFirstOrThrow\",\"MenuItem.findMany\",\"MenuItem.createOne\",\"MenuItem.createMany\",\"MenuItem.createManyAndReturn\",\"MenuItem.updateOne\",\"MenuItem.updateMany\",\"MenuItem.updateManyAndReturn\",\"MenuItem.upsertOne\",\"MenuItem.deleteOne\",\"MenuItem.deleteMany\",\"_avg\",\"_sum\",\"MenuItem.groupBy\",\"MenuItem.aggregate\",\"Order.findUnique\",\"Order.findUniqueOrThrow\",\"Order.findFirst\",\"Order.findFirstOrThrow\",\"Order.findMany\",\"Order.createOne\",\"Order.createMany\",\"Order.createManyAndReturn\",\"Order.updateOne\",\"Order.updateMany\",\"Order.updateManyAndReturn\",\"Order.upsertOne\",\"Order.deleteOne\",\"Order.deleteMany\",\"Order.groupBy\",\"Order.aggregate\",\"OrderItem.findUnique\",\"OrderItem.findUniqueOrThrow\",\"OrderItem.findFirst\",\"OrderItem.findFirstOrThrow\",\"OrderItem.findMany\",\"OrderItem.createOne\",\"OrderItem.createMany\",\"OrderItem.createManyAndReturn\",\"OrderItem.updateOne\",\"OrderItem.updateMany\",\"OrderItem.updateManyAndReturn\",\"OrderItem.upsertOne\",\"OrderItem.deleteOne\",\"OrderItem.deleteMany\",\"OrderItem.groupBy\",\"OrderItem.aggregate\",\"OrderStatusHistory.findUnique\",\"OrderStatusHistory.findUniqueOrThrow\",\"OrderStatusHistory.findFirst\",\"OrderStatusHistory.findFirstOrThrow\",\"OrderStatusHistory.findMany\",\"OrderStatusHistory.createOne\",\"OrderStatusHistory.createMany\",\"OrderStatusHistory.createManyAndReturn\",\"OrderStatusHistory.updateOne\",\"OrderStatusHistory.updateMany\",\"OrderStatusHistory.updateManyAndReturn\",\"OrderStatusHistory.upsertOne\",\"OrderStatusHistory.deleteOne\",\"OrderStatusHistory.deleteMany\",\"OrderStatusHistory.groupBy\",\"OrderStatusHistory.aggregate\",\"AND\",\"OR\",\"NOT\",\"id\",\"orderId\",\"OrderStatus\",\"previousStatus\",\"newStatus\",\"changedById\",\"OrderChangeSource\",\"changeSource\",\"OrderReasonCode\",\"reasonCode\",\"reasonNote\",\"changedAt\",\"equals\",\"in\",\"notIn\",\"lt\",\"lte\",\"gt\",\"gte\",\"not\",\"contains\",\"startsWith\",\"endsWith\",\"menuItemId\",\"itemName\",\"unitPrice\",\"quantity\",\"lineTotal\",\"createdAt\",\"customerId\",\"status\",\"PaymentMethod\",\"paymentMethod\",\"PaymentStatus\",\"paymentStatus\",\"subtotal\",\"notes\",\"acceptanceDeadline\",\"idempotencyKey\",\"updatedAt\",\"categoryId\",\"name\",\"description\",\"price\",\"imageUrl\",\"isAvailable\",\"isActive\",\"nameNormalized\",\"every\",\"some\",\"none\",\"userId\",\"tokenHash\",\"expiresAt\",\"revokedAt\",\"replacedByTokenId\",\"email\",\"emailNormalized\",\"passwordHash\",\"UserRole\",\"role\",\"customerId_idempotencyKey\",\"is\",\"isNot\",\"connectOrCreate\",\"upsert\",\"createMany\",\"set\",\"disconnect\",\"delete\",\"connect\",\"updateMany\",\"deleteMany\",\"increment\",\"decrement\",\"multiply\",\"divide\"]"),
+  graph: "9gNDcA8NAACMAgAgEQAAjQIAIBIAAI4CACCLAQAAigIAMIwBAAAWABCNAQAAigIAMI4BAQAAAAGqAUAA-QEAIbUBQAD5AQAhtwEBAPYBACG8ASAA-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_AwAgEQAAwAMAIBIAAMEDACADAAAAFgAgAQAAJQAwAgAAAQAgAwAAABYAIAEAACUAMAIAAAEAIAMAAAAWACABAAAlADACAAABACAMDQAAvAMAIBEAAL0DACASAAC-AwAgjgEBAAAAAaoBQAAAAAG1AUAAAAABtwEBAAAAAbwBIAAAAAHGAQEAAAABxwEBAAAAAcgBAQAAAAHKAQAAAMoBAgEYAAApACAJjgEBAAAAAaoBQAAAAAG1AUAAAAABtwEBAAAAAbwBIAAAAAHGAQEAAAABxwEBAAAAAcgBAQAAAAHKAQAAAMoBAgEYAAArADABGAAAKwAwDA0AAJgDACARAACZAwAgEgAAmgMAII4BAQClAgAhqgFAAKsCACG1AUAAqwIAIbcBAQClAgAhvAEgAOUCACHGAQEApQIAIccBAQClAgAhyAEBAKUCACHKAQAAlwPKASICAAAAAQAgGAAALgAgCY4BAQClAgAhqgFAAKsCACG1AUAAqwIAIbcBAQClAgAhvAEgAOUCACHGAQEApQIAIccBAQClAgAhyAEBAKUCACHKAQAAlwPKASICAAAAFgAgGAAAMAAgAgAAABYAIBgAADAAIAMAAAABACAfAAApACAgAAAuACABAAAAAQAgAQAAABYAIAMGAACUAwAgJQAAlgMAICYAAJUDACAMiwEAAIACADCMAQAANwAQjQEAAIACADCOAQEAxgEAIaoBQADNAQAhtQFAAM0BACG3AQEA4AEAIbwBIADwAQAhxgEBAOABACHHAQEA4AEAIcgBAQDgAQAhygEAAIECygEiAwAAABYAIAEAADYAMCQAADcAIAMAAAAWACABAAAlADACAAABACABAAAAHAAgAQAAABwAIAMAAAAaACABAAAbADACAAAcACADAAAAGgAgAQAAGwAwAgAAHAAgAwAAABoAIAEAABsAMAIAABwAIAoOAACRAwAgDwAAkwMAIBAAAJIDACCOAQEAAAABqgFAAAAAAcEBAQAAAAHCAQEAAAABwwFAAAAAAcQBQAAAAAHFAQEAAAABARgAAD8AIAeOAQEAAAABqgFAAAAAAcEBAQAAAAHCAQEAAAABwwFAAAAAAcQBQAAAAAHFAQEAAAABARgAAEEAMAEYAABBADABAAAAGgAgCg4AAIkDACAPAACKAwAgEAAAiwMAII4BAQClAgAhqgFAAKsCACHBAQEApQIAIcIBAQClAgAhwwFAAKsCACHEAUAAiAMAIcUBAQCqAgAhAgAAABwAIBgAAEUAIAeOAQEApQIAIaoBQACrAgAhwQEBAKUCACHCAQEApQIAIcMBQACrAgAhxAFAAIgDACHFAQEAqgIAIQIAAAAaACAYAABHACACAAAAGgAgGAAARwAgAQAAABoAIAMAAAAcACAfAAA_ACAgAABFACABAAAAHAAgAQAAABoAIAUGAACFAwAgJQAAhwMAICYAAIYDACDEAQAAoQIAIMUBAAChAgAgCosBAAD8AQAwjAEAAE8AEI0BAAD8AQAwjgEBAMYBACGqAUAAzQEAIcEBAQDGAQAhwgEBAOABACHDAUAAzQEAIcQBQAD9AQAhxQEBAMkBACEDAAAAGgAgAQAATgAwJAAATwAgAwAAABoAIAEAABsAMAIAABwAIAsFAAD6AQAgiwEAAPQBADCMAQAAVQAQjQEAAPQBADCOAQEAAAABqgFAAPkBACG1AUAA-QEAIbcBAQD2AQAhuAEBAPcBACG8ASAA-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_AQAACwAgwAEAAAsAIAiaAQEAAAABmwEBAAAABJwBAQAAAASdAQEAAAABngEBAAAAAZ8BAQAAAAGgAQEAAAABoQEBAPsBACEKiwEAAPwBADCMAQAATwAQjQEAAPwBADCOAQEAxgEAIaoBQADNAQAhwQEBAMYBACHCAQEA4AEAIcMBQADNAQAhxAFAAP0BACHFAQEAyQEAIQsGAADSAQAgJQAA_wEAICYAAP8BACCaAUAAAAABmwFAAAAABZwBQAAAAAWdAUAAAAABngFAAAAAAZ8BQAAAAAGgAUAAAAABoQFAAP4BACELBgAA0gEAICUAAP8BACAmAAD_AQAgmgFAAAAAAZsBQAAAAAWcAUAAAAAFnQFAAAAAAZ4BQAAAAAGfAUAAAAABoAFAAAAAAaEBQAD-AQAhCJoBQAAAAAGbAUAAAAAFnAFAAAAABZ0BQAAAAAGeAUAAAAABnwFAAAAAAaABQAAAAAGhAUAA_wEAIQyLAQAAgAIAMIwBAAA3ABCNAQAAgAIAMI4BAQDGAQAhqgFAAM0BACG1AUAAzQEAIbcBAQDgAQAhvAEgAPABACHGAQEA4AEAIccBAQDgAQAhyAEBAOABACHKAQAAgQLKASIHBgAAzwEAICUAAIMCACAmAACDAgAgmgEAAADKAQKbAQAAAMoBCJwBAAAAygEIoQEAAIICygEiBwYAAM8BACAlAACDAgAgJgAAgwIAIJoBAAAAygECmwEAAADKAQicAQAAAMoBCKEBAACCAsoBIgSaAQAAAMoBApsBAAAAygEInAEAAADKAQihAQAAgwLKASINDgAAhgIAIA8AAIcCACAQAACHAgAgiwEAAIQCADCMAQAAGgAQjQEAAIQCADCOAQEA9QEAIaoBQAD5AQAhwQEBAPUBACHCAQEA9gEAIcMBQAD5AQAhxAFAAIUCACHFAQEAiAIAIQiaAUAAAAABmwFAAAAABZwBQAAAAAWdAUAAAAABngFAAAAAAZ8BQAAAAAGgAUAAAAABoQFAAP8BACERDQAAjAIAIBEAAI0CACASAACOAgAgiwEAAIoCADCMAQAAFgAQjQEAAIoCADCOAQEA9QEAIaoBQAD5AQAhtQFAAPkBACG3AQEA9gEAIbwBIAD4AQAhxgEBAPYBACHHAQEA9gEAIcgBAQD2AQAhygEAAIsCygEizAEAABYAIM0BAAAWACAPDgAAhgIAIA8AAIcCACAQAACHAgAgiwEAAIQCADCMAQAAGgAQjQEAAIQCADCOAQEA9QEAIaoBQAD5AQAhwQEBAPUBACHCAQEA9gEAIcMBQAD5AQAhxAFAAIUCACHFAQEAiAIAIcwBAAAaACDNAQAAGgAgCJoBAQAAAAGbAQEAAAAFnAEBAAAABZ0BAQAAAAGeAQEAAAABnwEBAAAAAaABAQAAAAGhAQEAiQIAIQiaAQEAAAABmwEBAAAABZwBAQAAAAWdAQEAAAABngEBAAAAAZ8BAQAAAAGgAQEAAAABoQEBAIkCACEPDQAAjAIAIBEAAI0CACASAACOAgAgiwEAAIoCADCMAQAAFgAQjQEAAIoCADCOAQEA9QEAIaoBQAD5AQAhtQFAAPkBACG3AQEA9gEAIbwBIAD4AQAhxgEBAPYBACHHAQEA9gEAIcgBAQD2AQAhygEAAIsCygEiBJoBAAAAygECmwEAAADKAQicAQAAAMoBCKEBAACDAsoBIgO-AQAAAwAgvwEAAAMAIMABAAADACADvgEAABoAIL8BAAAaACDAAQAAGgAgA74BAAASACC_AQAAEgAgwAEAABIAIA4EAACUAgAgCwAAlQIAIIsBAACPAgAwjAEAABIAEI0BAACPAgAwjgEBAPUBACGPAQEA9QEAIZEBAACQApEBI5IBAACRApEBIpMBAQCIAgAhlQEAAJIClQEilwEAAJMClwEjmAEBAPcBACGZAUAA-QEAIQSaAQAAAJEBA5sBAAAAkQEJnAEAAACRAQmhAQAA3AGRASMEmgEAAACRAQKbAQAAAJEBCJwBAAAAkQEIoQEAANoBkQEiBJoBAAAAlQECmwEAAACVAQicAQAAAJUBCKEBAADXAZUBIgSaAQAAAJcBA5sBAAAAlwEJnAEAAACXAQmhAQAA1QGXASMTAwAAhgIAIAoAAJkCACAMAACOAgAgiwEAAJ4CADCMAQAAAwAQjQEAAJ4CADCOAQEA9QEAIaoBQAD5AQAhqwEBAPUBACGsAQAAkQKRASKuAQAAnwKuASKwAQAAoAKwASKxARAAlwIAIbIBAQD3AQAhswFAAPkBACG0AQEA9QEAIbUBQAD5AQAhzAEAAAMAIM0BAAADACARDQAAjAIAIBEAAI0CACASAACOAgAgiwEAAIoCADCMAQAAFgAQjQEAAIoCADCOAQEA9QEAIaoBQAD5AQAhtQFAAPkBACG3AQEA9gEAIbwBIAD4AQAhxgEBAPYBACHHAQEA9gEAIcgBAQD2AQAhygEAAIsCygEizAEAABYAIM0BAAAWACAPBwAAmAIAIAgAAJkCACCLAQAAlgIAMIwBAAALABCNAQAAlgIAMI4BAQD1AQAhqgFAAPkBACG1AUAA-QEAIbYBAQD1AQAhtwEBAPYBACG4AQEA9wEAIbkBEACXAgAhugEBAPcBACG7ASAA-AEAIbwBIAD4AQAhCJoBEAAAAAGbARAAAAAEnAEQAAAABJ0BEAAAAAGeARAAAAABnwEQAAAAAaABEAAAAAGhARAA5gEAIQ0FAAD6AQAgiwEAAPQBADCMAQAAVQAQjQEAAPQBADCOAQEA9QEAIaoBQAD5AQAhtQFAAPkBACG3AQEA9gEAIbgBAQD3AQAhvAEgAPgBACG9AQEA9gEAIcwBAABVACDNAQAAVQAgA74BAAAHACC_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DCOAQEA9QEAIY8BAQD1AQAhpQEBAPUBACGmAQEA9gEAIacBEACXAgAhqAECAJsCACGpARAAlwIAIaoBQAD5AQAhC4sBAADYAgAwjAEAANkCABCNAQAA2AIAMI4BAQD1AQAhjwEBAPUBACGlAQEA9QEAIaYBAQD2AQAhpwEQAJcCACGoAQIAmwIAIakBEACXAgAhqgFAAPkBACEHjgEBAKUCACGlAQEApQIAIaYBAQClAgAhpwEQALUCACGoAQIAtgIAIakBEAC1AgAhqgFAAKsCACEICQAAuAIAII4BAQClAgAhpQEBAKUCACGmAQEApQIAIacBEAC1AgAhqAECALYCACGpARAAtQIAIaoBQACrAgAhCAkAALoCACCOAQEAAAABpQEBAAAAAaYBAQAAAAGnARAAAAABqAECAAAAAakBEAAAAAGqAUAAAAABAx8AANwDACDOAQAA3QMAINQBAAABACAEHwAA0QIAMM4BAADSAgAw0AEAANQCACDUAQAA1QIAMAQfAADFAgAwzgEAAMYCADDQAQAAyAIAINQBAADJAgAwAAAAAAAB0QEgAAAAAQUfAADWAwAgIAAA2gMAIM4BAADXAwAgzwEAANkDACDUAQAAUgAgCx8AAOgCADAgAADsAgAwzgEAAOkCADDPAQAA6gIAMNABAADrAgAg0QEAANUCADDSAQAA1QIAMNMBAADVAgAw1AEAANUCADDVAQAA7QIAMNYBAADYAgAwCAQAALkCACCOAQEAAAABjwEBAAAAAaYBAQAAAAGnARAAAAABqAECAAAAAakBEAAAAAGqAUAAAAABAgAAAAkAIB8AAPACACADAAAACQAgHwAA8AIAICAAAO8CACABGAAA2AMAMAIAAAAJACAYAADvAgAgAgAAANkCACAYAADuAgAgB44BAQClAgAhjwEBAKUCACGmAQEApQIAIacBEAC1AgAhqAECALYCACGpARAAtQIAIaoBQACrAgAhCAQAALcCACCOAQEApQIAIY8BAQClAgAhpgEBAKUCACGnARAAtQIAIagBAgC2AgAhqQEQALUCACGqAUAAqwIAIQgEAAC5AgAgjgEBAAAAAY8BAQAAAAGmAQEAAAABpwEQAAAAAagBAgAAAAGpARAAAAABqgFAAAAAAQMfAADWAwAgzgEAANcDACDUAQAAUgAgBB8AAOgCADDOAQAA6QIAMNABAADrAgAg1AEAANUCADAAAAALHwAA9wIAMCAAAPwCADDOAQAA-AIAMM8BAAD5AgAw0AEAAPoCACDRAQAA-wIAMNIBAAD7AgAw0wEAAPsCADDUAQAA-wIAMNUBAAD9AgAw1gEAAP4CADAKCAAA8gIAII4BAQAAAAGqAUAAAAABtQFAAAAAAbcBAQAAAAG4AQEAAAABuQEQAAAAAboBAQAAAAG7ASAAAAABvAEgAAAAAQIAAAANACAfAACCAwAgAwAAAA0AIB8AAIIDACAgAACBAwAgARgAANUDADAPBwAAmAIAIAgAAJkCACCLAQAAlgIAMIwBAAALABCNAQAAlgIAMI4BAQAAAAGqAUAA-QEAIbUBQAD5AQAhtgEBAPUBACG3AQEA9gEAIbgBAQD3AQAhuQEQAJcCACG6AQEA9wEAIbsBIAD4AQAhvAEgAPgBACECAAAADQAgGAAAgQMAIAIAAAD_AgAgGAAAgAMAIA2LAQAA_gIAMIwBAAD_AgAQjQEAAP4CADCOAQEA9QEAIaoBQAD5AQAhtQFAAPkBACG2AQEA9QEAIbcBAQD2AQAhuAEBAPcBACG5ARAAlwIAIboBAQD3AQAhuwEgAPgBACG8ASAA-AEAIQ2LAQAA_gIAMIwBAAD_AgAQjQEAAP4CADCOAQEA9QEAIaoBQAD5AQAhtQFAAPkBACG2AQEA9QEAIbcBAQD2AQAhuAEBAPcBACG5ARAAlwIAIboBAQD3AQAhuwEgAPgBACG8ASAA-AEAIQmOAQEApQIAIaoBQACrAgAhtQFAAKsCACG3AQEApQIAIbgBAQCqAgAhuQEQALUCACG6AQEAqgIAIbsBIADlAgAhvAEgAOUCACEKCAAA5wIAII4BAQClAgAhqgFAAKsCACG1AUAAqwIAIbcBAQClAgAhuAEBAKoCACG5ARAAtQIAIboBAQCqAgAhuwEgAOUCACG8ASAA5QIAIQoIAADyAgAgjgEBAAAAAaoBQAAAAAG1AUAAAAABtwEBAAAAAbgBAQAAAAG5ARAAAAABugEBAAAAAbsBIAAAAAG8ASAAAAABBB8AAPcCADDOAQAA-AIAMNABAAD6AgAg1AEAAPsCADAAAAAAAdEBQAAAAAEFHwAAzQMAICAAANMDACDOAQAAzgMAIM8BAADSAwAg1AEAAAEAIAcfAADLAwAgIAAA0AMAIM4BAADMAwAgzwEAAM8DACDSAQAAGgAg0wEAABoAINQBAAAcACAHHwAAjAMAICAAAI8DACDOAQAAjQMAIM8BAACOAwAg0gEAABoAINMBAAAaACDUAQAAHAAgCA4AAJEDACAQAACSAwAgjgEBAAAAAaoBQAAAAAHBAQEAAAABwgEBAAAAAcMBQAAAAAHEAUAAAAABAgAAABwAIB8AAIwDACADAAAAGgAgHwAAjAMAICAAAJADACAKAAAAGgAgDgAAiQMAIBAAAIsDACAYAACQAwAgjgEBAKUCACGqAUAAqwIAIcEBAQClAgAhwgEBAKUCACHDAUAAqwIAIcQBQACIAwAhCA4AAIkDACAQAACLAwAgjgEBAKUCACGqAUAAqwIAIcEBAQClAgAhwgEBAKUCACHDAUAAqwIAIcQBQACIAwAhAx8AAM0DACDOAQAAzgMAINQBAAABACADHwAAjAMAIM4BAACNAwAg1AEAABwAIAMfAADLAwAgzgEAAMwDACDUAQAAHAAgAAAAAdEBAAAAygECCx8AALADADAgAAC1AwAwzgEAALEDADDPAQAAsgMAMNABAACzAwAg0QEAALQDADDSAQAAtAMAMNMBAAC0AwAw1AEAALQDADDVAQAAtgMAMNYBAAC3AwAwCx8AAKQDADAgAACpAwAwzgEAAKUDADDPAQAApgMAMNABAACnAwAg0QEAAKgDADDSAQAAqAMAMNMBAACoAwAw1AEAAKgDADDVAQAAqgMAMNYBAACrAwAwCx8AAJsDADAgAACfAwAwzgEAAJwDADDPAQAAnQMAMNABAACeAwAg0QEAAMkCADDSAQAAyQIAMNMBAADJAgAw1AEAAMkCADDVAQAAoAMAMNYBAADMAgAwCQQAAK4CACCOAQEAAAABjwEBAAAAAZEBAAAAkQEDkgEAAACRAQKVAQAAAJUBApcBAAAAlwEDmAEBAAAAAZkBQAAAAAECAAAAFAAgHwAAowMAIAMAAAAUACAfAACjAwAgIAAAogMAIAEYAADKAwAwAgAAABQAIBgAAKIDACACAAAAzQIAIBgAAKEDACAIjgEBAKUCACGPAQEApQIAIZEBAACmApEBI5IBAACnApEBIpUBAACoApUBIpcBAACpApcBI5gBAQCqAgAhmQFAAKsCACEJBAAArAIAII4BAQClAgAhjwEBAKUCACGRAQAApgKRASOSAQAApwKRASKVAQAAqAKVASKXAQAAqQKXASOYAQEAqgIAIZkBQACrAgAhCQQAAK4CACCOAQEAAAABjwEBAAAAAZEBAAAAkQEDkgEAAACRAQKVAQAAAJUBApcBAAAAlwEDmAEBAAAAAZkBQAAAAAEIDwAAkwMAIBAAAJIDACCOAQEAAAABqgFAAAAAAcIBAQAAAAHDAUAAAAABxAFAAAAAAcUBAQAAAAECAAAAHAAgHwAArwMAIAMAAAAcACAfAACvAwAgIAAArgMAIAEYAADJAwAwDQ4AAIYCACAPAACHAgAgEAAAhwIAIIsBAACEAgAwjAEAABoAEI0BAACEAgAwjgEBAAAAAaoBQAD5AQAhwQEBAPUBACHCAQEAAAABwwFAAPkBACHEAUAAhQIAIcUBAQAAAAECAAAAHAAgGAAArgMAIAIAAACsAwAgGAAArQMAIAqLAQAAqwMAMIwBAACsAwAQjQEAAKsDADCOAQEA9QEAIaoBQAD5AQAhwQEBAPUBACHCAQEA9gEAIcMBQAD5AQAhxAFAAIUCACHFAQEAiAIAIQqLAQAAqwMAMIwBAACsAwAQjQEAAKsDADCOAQEA9QEAIaoBQAD5AQAhwQEBAPUBACHCAQEA9gEAIcMBQAD5AQAhxAFAAIUCACHFAQEAiAIAIQaOAQEApQIAIaoBQACrAgAhwgEBAKUCACHDAUAAqwIAIcQBQACIAwAhxQEBAKoCACEIDwAAigMAIBAAAIsDACCOAQEApQIAIaoBQACrAgAhwgEBAKUCACHDAUAAqwIAIcQBQACIAwAhxQEBAKoCACEIDwAAkwMAIBAAAJIDACCOAQEAAAABqgFAAAAAAcIBAQAAAAHDAUAAAAABxAFAAAAAAcUBAQAAAAEMCgAA3gIAIAwAAN8CACCOAQEAAAABqgFAAAAAAawBAAAAkQECrgEAAACuAQKwAQAAALABArEBEAAAAAGyAQEAAAABswFAAAAAAbQBAQAAAAG1AUAAAAABAgAAAAUAIB8AALsDACADAAAABQAgHwAAuwMAICAAALoDACABGAAAyAMAMBIDAACGAgAgCgAAmQIAIAwAAI4CACCLAQAAngIAMIwBAAADABCNAQAAngIAMI4BAQAAAAGqAUAA-QEAIasBAQD1AQAhrAEAAJECkQEirgEAAJ8CrgEisAEAAKACsAEisQEQAJcCACGyAQEA9wEAIbMBQAD5AQAhtAEBAPUBACG1AUAA-QEAIcsBAACdAgAgAgAAAAUAIBgAALoDACACAAAAuAMAIBgAALkDACAOiwEAALcDADCMAQAAuAMAEI0BAAC3AwAwjgEBAPUBACGqAUAA-QEAIasBAQD1AQAhrAEAAJECkQEirgEAAJ8CrgEisAEAAKACsAEisQEQAJcCACGyAQEA9wEAIbMBQAD5AQAhtAEBAPUBACG1AUAA-QEAIQ6LAQAAtwMAMIwBAAC4AwAQjQEAALcDADCOAQEA9QEAIaoBQAD5AQAhqwEBAPUBACGsAQAAkQKRASKuAQAAnwKuASKwAQAAoAKwASKxARAAlwIAIbIBAQD3AQAhswFAAPkBACG0AQEA9QEAIbUBQAD5AQAhCo4BAQClAgAhqgFAAKsCACGsAQAApwKRASKuAQAAwAKuASKwAQAAwQKwASKxARAAtQIAIbIBAQCqAgAhswFAAKsCACG0AQEApQIAIbUBQACrAgAhDAoAAMMCACAMAADEAgAgjgEBAKUCACGqAUAAqwIAIawBAACnApEBIq4BAADAAq4BIrABAADBArABIrEBEAC1AgAhsgEBAKoCACGzAUAAqwIAIbQBAQClAgAhtQFAAKsCACEMCgAA3gIAIAwAAN8CACCOAQEAAAABqgFAAAAAAawBAAAAkQECrgEAAACuAQKwAQAAALABArEBEAAAAAGyAQEAAAABswFAAAAAAbQBAQAAAAG1AUAAAAABBB8AALADADDOAQAAsQMAMNABAACzAwAg1AEAALQDADAEHwAApAMAMM4BAAClAwAw0AEAAKcDACDUAQAAqAMAMAQfAACbAwAwzgEAAJwDADDQAQAAngMAINQBAADJAgAwAAAAAw0AAL8DACARAADAAwAgEgAAwQMAIAUOAADCAwAgDwAAwwMAIBAAAMMDACDEAQAAoQIAIMUBAAChAgAgBAMAAMIDACAKAADGAwAgDAAAwQMAILIBAAChAgAgAgUAAIQDACC4AQAAoQIAIAAEBwAAxQMAIAgAAMYDACC4AQAAoQIAILoBAAChAgAgCo4BAQAAAAGqAUAAAAABrAEAAACRAQKuAQAAAK4BArABAAAAsAECsQEQAAAAAbIBAQAAAAGzAUAAAAABtAEBAAAAAbUBQAAAAAEGjgEBAAAAAaoBQAAAAAHCAQEAAAABwwFAAAAAAcQBQAAAAAHFAQEAAAABCI4BAQAAAAGPAQEAAAABkQEAAACRAQOSAQAAAJEBApUBAAAAlQEClwEAAACXAQOYAQEAAAABmQFAAAAAAQkOAACRAwAgDwAAkwMAII4BAQAAAAGqAUAAAAABwQEBAAAAAcIBAQAAAAHDAUAAAAABxAFAAAAAAcUBAQAAAAECAAAAHAAgHwAAywMAIAsNAAC8AwAgEgAAvgMAII4BAQAAAAGqAUAAAAABtQFAAAAAAbcBAQAAAAG8ASAAAAABxgEBAAAAAccBAQAAAAHIAQEAAAABygEAAADKAQICAAAAAQAgHwAAzQMAIAMAAAAaACAfAADLAwAgIAAA0QMAIAsAAAAaACAOAACJAwAgDwAAigMAIBgAANEDACCOAQEApQIAIaoBQACrAgAhwQEBAKUCACHCAQEApQIAIcMBQACrAgAhxAFAAIgDACHFAQEAqgIAIQkOAACJAwAgDwAAigMAII4BAQClAgAhqgFAAKsCACHBAQEApQIAIcIBAQClAgAhwwFAAKsCACHEAUAAiAMAIcUBAQCqAgAhAwAAABYAIB8AAM0DACAgAADUAwAgDQAAABYAIA0AAJgDACASAACaAwAgGAAA1AMAII4BAQClAgAhqgFAAKsCACG1AUAAqwIAIbcBAQClAgAhvAEgAOUCACHGAQEApQIAIccBAQClAgAhyAEBAKUCACHKAQAAlwPKASILDQAAmAMAIBIAAJoDACCOAQEApQIAIaoBQACrAgAhtQFAAKsCACG3AQEApQIAIbwBIADlAgAhxgEBAKUCACHHAQEApQIAIcgBAQClAgAhygEAAJcDygEiCY4BAQAAAAGqAUAAAAABtQFAAAAAAbcBAQAAAAG4AQEAAAABuQEQAAAAAboBAQAAAAG7ASAAAAABvAEgAAAAAQeOAQEAAAABqgFAAAAAAbUBQAAAAAG3AQEAAAABuAEBAAAAAbwBIAAAAAG9AQEAAAABAgAAAFIAIB8AANYDACAHjgEBAAAAAY8BAQAAAAGmAQEAAAABpwEQAAAAAagBAgAAAAGpARAAAAABqgFAAAAAAQMAAABVACAfAADWAwAgIAAA2wMAIAkAAABVACAYAADbAwAgjgEBAKUCACGqAUAAqwIAIbUBQACrAgAhtwEBAKUCACG4AQEAqgIAIbwBIADlAgAhvQEBAKUCACEHjgEBAKUCACGqAUAAqwIAIbUBQACrAgAhtwEBAKUCACG4AQEAqgIAIbwBIADlAgAhvQEBAKUCACELEQAAvQMAIBIAAL4DACCOAQEAAAABqgFAAAAAAbUBQAAAAAG3AQEAAAABvAEgAAAAAcYBAQAAAAHHAQEAAAAByAEBAAAAAcoBAAAAygECAgAAAAEAIB8AANwDACAHjgEBAAAAAaUBAQAAAAGmAQEAAAABpwEQAAAAAagBAgAAAAGpARAAAAABqgFAAAAAAQiOAQEAAAABkQEAAACRAQOSAQAAAJEBApMBAQAAAAGVAQAAAJUBApcBAAAAlwEDmAEBAAAAAZkBQAAAAAEDAAAAFgAgHwAA3AMAICAAAOIDACANAAAAFgAgEQAAmQMAIBIAAJoDACAYAADiAwAgjgEBAKUCACGqAUAAqwIAIbUBQACrAgAhtwEBAKUCACG8ASAA5QIAIcYBAQClAgAhxwEBAKUCACHIAQEApQIAIcoBAACXA8oBIgsRAACZAwAgEgAAmgMAII4BAQClAgAhqgFAAKsCACG1AUAAqwIAIbcBAQClAgAhvAEgAOUCACHGAQEApQIAIccBAQClAgAhyAEBAKUCACHKAQAAlwPKASILBwAA8QIAII4BAQAAAAGqAUAAAAABtQFAAAAAAbYBAQAAAAG3AQEAAAABuAEBAAAAAbkBEAAAAAG6AQEAAAABuwEgAAAAAbwBIAAAAAECAAAADQAgHwAA4wMAIA0DAADdAgAgDAAA3wIAII4BAQAAAAGqAUAAAAABqwEBAAAAAawBAAAAkQECrgEAAACuAQKwAQAAALABArEBEAAAAAGyAQEAAAABswFAAAAAAbQBAQAAAAG1AUAAAAABAgAAAAUAIB8AAOUDACADAAAACwAgHwAA4wMAICAAAOkDACANAAAACwAgBwAA5gIAIBgAAOkDACCOAQEApQIAIaoBQACrAgAhtQFAAKsCACG2AQEApQIAIbcBAQClAgAhuAEBAKoCACG5ARAAtQIAIboBAQCqAgAhuwEgAOUCACG8ASAA5QIAIQsHAADmAgAgjgEBAKUCACGqAUAAqwIAIbUBQACrAgAhtgEBAKUCACG3AQEApQIAIbgBAQCqAgAhuQEQALUCACG6AQEAqgIAIbsBIADlAgAhvAEgAOUCACEDAAAAAwAgHwAA5QMAICAAAOwDACAPAAAAAwAgAwAAwgIAIAwAAMQCACAYAADsAwAgjgEBAKUCACGqAUAAqwIAIasBAQClAgAhrAEAAKcCkQEirgEAAMACrgEisAEAAMECsAEisQEQALUCACGyAQEAqgIAIbMBQACrAgAhtAEBAKUCACG1AUAAqwIAIQ0DAADCAgAgDAAAxAIAII4BAQClAgAhqgFAAKsCACGrAQEApQIAIawBAACnApEBIq4BAADAAq4BIrABAADBArABIrEBEAC1AgAhsgEBAKoCACGzAUAAqwIAIbQBAQClAgAhtQFAAKsCACELDQAAvAMAIBEAAL0DACCOAQEAAAABqgFAAAAAAbUBQAAAAAG3AQEAAAABvAEgAAAAAcYBAQAAAAHHAQEAAAAByAEBAAAAAcoBAAAAygECAgAAAAEAIB8AAO0DACANAwAA3QIAIAoAAN4CACCOAQEAAAABqgFAAAAAAasBAQAAAAGsAQAAAJEBAq4BAAAArgECsAEAAACwAQKxARAAAAABsgEBAAAAAbMBQAAAAAG0AQEAAAABtQFAAAAAAQIAAAAFACAfAADvAwAgAwAAABYAIB8AAO0DACAgAADzAwAgDQAAABYAIA0AAJgDACARAACZAwAgGAAA8wMAII4BAQClAgAhqgFAAKsCACG1AUAAqwIAIbcBAQClAgAhvAEgAOUCACHGAQEApQIAIccBAQClAgAhyAEBAKUCACHKAQAAlwPKASILDQAAmAMAIBEAAJkDACCOAQEApQIAIaoBQACrAgAhtQFAAKsCACG3AQEApQIAIbwBIADlAgAhxgEBAKUCACHHAQEApQIAIcgBAQClAgAhygEAAJcDygEiAwAAAAMAIB8AAO8DACAgAAD2AwAgDwAAAAMAIAMAAMICACAKAADDAgAgGAAA9gMAII4BAQClAgAhqgFAAKsCACGrAQEApQIAIawBAACnApEBIq4BAADAAq4BIrABAADBArABIrEBEAC1AgAhsgEBAKoCACGzAUAAqwIAIbQBAQClAgAhtQFAAKsCACENAwAAwgIAIAoAAMMCACCOAQEApQIAIaoBQACrAgAhqwEBAKUCACGsAQAApwKRASKuAQAAwAKuASKwAQAAwQKwASKxARAAtQIAIbIBAQCqAgAhswFAAKsCACG0AQEApQIAIbUBQACrAgAhBAYACw0GAhEdChIgCAQDAAEGAAkKCgMMFQgCBAACCQAEAwYABwcABQgQAwIFDgQGAAYBBQ8AAQgRAAIEAAILFwECChgADBkAAw4AAQ8eChAfCgMNIQARIgASIwAAAAADBgAQJQARJgASAAAAAwYAECUAESYAEgIOAAEPRAoCDgABD0oKAwYAFyUAGCYAGQAAAAMGABclABgmABkAAAMGAB4lAB8mACAAAAADBgAeJQAfJgAgAQcABQEHAAUFBgAlJQAoJgApVwAmWAAnAAAAAAAFBgAlJQAoJgApVwAmWAAnAQMAAQEDAAEFBgAuJQAxJgAyVwAvWAAwAAAAAAAFBgAuJQAxJgAyVwAvWAAwAgQAAgkABAIEAAIJAAQFBgA3JQA6JgA7VwA4WAA5AAAAAAAFBgA3JQA6JgA7VwA4WAA5AgQAAgu3AQECBAACC70BAQMGAEAlAEEmAEIAAAADBgBAJQBBJgBCEwIBFCQBFSYBFicBFygBGSoBGiwMGy0NHC8BHTEMHjIOITMBIjQBIzUMJzgPKDkTKToKKjsKKzwKLD0KLT4KLkAKL0IMMEMUMUYKMkgMM0kVNEsKNUwKNk0MN1AWOFEaOVMFOlQFO1cFPFgFPVkFPlsFP10MQF4bQWAFQmIMQ2McRGQFRWUFRmYMR2kdSGohSWsESmwES20ETG4ETW8ETnEET3MMUHQiUXYEUngMU3kjVHoEVXsEVnwMWX8kWoABKluBAQJcggECXYMBAl6EAQJfhQECYIcBAmGJAQxiigErY4wBAmSOAQxljwEsZpABAmeRAQJokgEMaZUBLWqWATNrlwEDbJgBA22ZAQNumgEDb5sBA3CdAQNxnwEMcqABNHOiAQN0pAEMdaUBNXamAQN3pwEDeKgBDHmrATZ6rAE8e60BCHyuAQh9rwEIfrABCH-xAQiAAbMBCIEBtQEMggG2AT2DAbkBCIQBuwEMhQG8AT6GAb4BCIcBvwEIiAHAAQyJAcMBP4oBxAFD"
+}
+
+async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
+  const { Buffer } = await import('node:buffer')
+  const wasmArray = Buffer.from(wasmBase64, 'base64')
+  return new WebAssembly.Module(wasmArray)
+}
+
+config.compilerWasm = {
+  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.mjs"),
+
+  getQueryCompilerWasmModule: async () => {
+    const { wasm } = await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.mjs")
+    return await decodeBase64AsWasm(wasm)
+  },
+
+  importName: "./query_compiler_fast_bg.js"
+}
+
+
+
+export type LogOptions<ClientOptions extends Prisma.PrismaClientOptions> =
+  'log' extends keyof ClientOptions ? ClientOptions['log'] extends Array<Prisma.LogLevel | Prisma.LogDefinition> ? Prisma.GetEvents<ClientOptions['log']> : never : never
+
+export interface PrismaClientConstructor {
+    /**
+   * ## Prisma Client
+   * 
+   * Type-safe database client for TypeScript
+   * @example
+   * ```
+   * const prisma = new PrismaClient({
+   *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+   * })
+   * // Fetch zero or more Users
+   * const users = await prisma.user.findMany()
+   * ```
+   * 
+   * Read more in our [docs](https://pris.ly/d/client).
+   */
+
+  new <
+    Options extends Prisma.PrismaClientOptions = Prisma.PrismaClientOptions,
+    LogOpts extends LogOptions<Options> = LogOptions<Options>,
+    OmitOpts extends Prisma.PrismaClientOptions['omit'] = Options extends { omit: infer U } ? U : Prisma.PrismaClientOptions['omit'],
+    ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs
+  >(options: Prisma.PrismaClientConstructorArgs<Options>): PrismaClient<LogOpts, OmitOpts, ExtArgs>
+}
+
+/**
+ * ## Prisma Client
+ * 
+ * Type-safe database client for TypeScript
+ * @example
+ * ```
+ * const prisma = new PrismaClient({
+ *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+ * })
+ * // Fetch zero or more Users
+ * const users = await prisma.user.findMany()
+ * ```
+ * 
+ * Read more in our [docs](https://pris.ly/d/client).
+ */
+
+export interface PrismaClient<
+  in LogOpts extends Prisma.LogLevel = never,
+  in out OmitOpts extends Prisma.PrismaClientOptions['omit'] = Prisma.PrismaClientOptions['omit'],
+  in out ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs
+> {
+  [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['other'] }
+
+  $on<V extends LogOpts>(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) => void): PrismaClient;
+
+  /**
+   * Connect with the database
+   */
+  $connect(): runtime.Types.Utils.JsPromise<void>;
+
+  /**
+   * Disconnect from the database
+   */
+  $disconnect(): runtime.Types.Utils.JsPromise<void>;
+
+/**
+   * Executes a prepared raw query and returns the number of affected rows.
+   * @example
+   * ```
+   * const result = await prisma.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $executeRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<number>;
+
+  /**
+   * Executes a raw query and returns the number of affected rows.
+   * Susceptible to SQL injections, see documentation.
+   * @example
+   * ```
+   * const result = await prisma.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $executeRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<number>;
+
+  /**
+   * Performs a prepared raw query and returns the `SELECT` data.
+   * @example
+   * ```
+   * const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<T>;
+
+  /**
+   * Performs a raw query and returns the `SELECT` data.
+   * Susceptible to SQL injections, see documentation.
+   * @example
+   * ```
+   * const result = await prisma.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<T>;
+
+
+  /**
+   * Allows the running of a sequence of read/write operations that are guaranteed to either succeed or fail as a whole.
+   * @example
+   * ```
+   * const [george, bob, alice] = await prisma.$transaction([
+   *   prisma.user.create({ data: { name: 'George' } }),
+   *   prisma.user.create({ data: { name: 'Bob' } }),
+   *   prisma.user.create({ data: { name: 'Alice' } }),
+   * ])
+   * ```
+   * 
+   * Read more in our [docs](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
+   */
+  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): runtime.Types.Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
+
+  $transaction<R>(fn: (prisma: Omit<PrismaClient, runtime.ITXClientDenyList>) => runtime.Types.Utils.JsPromise<R>, options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): runtime.Types.Utils.JsPromise<R>
+
+  $extends: runtime.Types.Extensions.ExtendsHook<"extends", Prisma.TypeMapCb<OmitOpts>, ExtArgs, runtime.Types.Utils.Call<Prisma.TypeMapCb<OmitOpts>, {
+    extArgs: ExtArgs
+  }>>
+
+      /**
+   * `prisma.user`: Exposes CRUD operations for the **User** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Users
+    * const users = await prisma.user.findMany()
+    * ```
+    */
+  get user(): Prisma.UserDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.refreshToken`: Exposes CRUD operations for the **RefreshToken** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more RefreshTokens
+    * const refreshTokens = await prisma.refreshToken.findMany()
+    * ```
+    */
+  get refreshToken(): Prisma.RefreshTokenDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.category`: Exposes CRUD operations for the **Category** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Categories
+    * const categories = await prisma.category.findMany()
+    * ```
+    */
+  get category(): Prisma.CategoryDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.menuItem`: Exposes CRUD operations for the **MenuItem** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more MenuItems
+    * const menuItems = await prisma.menuItem.findMany()
+    * ```
+    */
+  get menuItem(): Prisma.MenuItemDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.order`: Exposes CRUD operations for the **Order** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Orders
+    * const orders = await prisma.order.findMany()
+    * ```
+    */
+  get order(): Prisma.OrderDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.orderItem`: Exposes CRUD operations for the **OrderItem** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more OrderItems
+    * const orderItems = await prisma.orderItem.findMany()
+    * ```
+    */
+  get orderItem(): Prisma.OrderItemDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.orderStatusHistory`: Exposes CRUD operations for the **OrderStatusHistory** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more OrderStatusHistories
+    * const orderStatusHistories = await prisma.orderStatusHistory.findMany()
+    * ```
+    */
+  get orderStatusHistory(): Prisma.OrderStatusHistoryDelegate<ExtArgs, { omit: OmitOpts }>;
+}
+
+export function getPrismaClientClass(): PrismaClientConstructor {
+  return runtime.getPrismaClient(config) as unknown as PrismaClientConstructor
+}
+===== D:\My Projects\food-ordering-platform\apps\api\src\generated\prisma\internal\prismaNamespace.ts
+
+/* !!! This is code generated by Prisma. Do not edit directly. !!! */
+/* eslint-disable */
+// biome-ignore-all lint: generated file
+// @ts-nocheck 
+/*
+ * WARNING: This is an internal file that is subject to change!
+ *
+ * 🛑 Under no circumstances should you import this file directly! 🛑
+ *
+ * All exports from this file are wrapped under a `Prisma` namespace object in the client.ts file.
+ * While this enables partial backward compatibility, it is not part of the stable public API.
+ *
+ * If you are looking for your Models, Enums, and Input Types, please import them from the respective
+ * model files in the `model` directory!
+ */
+
+import * as runtime from "@prisma/client/runtime/client"
+import type * as Prisma from "../models.js"
+import { type PrismaClient } from "./class.js"
+
+export type * from '../models.js'
+
+export type DMMF = typeof runtime.DMMF
+
+export type PrismaPromise<T> = runtime.Types.Public.PrismaPromise<T>
+
+/**
+ * Prisma Errors
+ */
+
+export const PrismaClientKnownRequestError = runtime.PrismaClientKnownRequestError
+export type PrismaClientKnownRequestError = runtime.PrismaClientKnownRequestError
+
+export const PrismaClientUnknownRequestError = runtime.PrismaClientUnknownRequestError
+export type PrismaClientUnknownRequestError = runtime.PrismaClientUnknownRequestError
+
+export const PrismaClientRustPanicError = runtime.PrismaClientRustPanicError
+export type PrismaClientRustPanicError = runtime.PrismaClientRustPanicError
+
+export const PrismaClientInitializationError = runtime.PrismaClientInitializationError
+export type PrismaClientInitializationError = runtime.PrismaClientInitializationError
+
+export const PrismaClientValidationError = runtime.PrismaClientValidationError
+export type PrismaClientValidationError = runtime.PrismaClientValidationError
+
+/**
+ * Re-export of sql-template-tag
+ */
+export const sql = runtime.sqltag
+export const empty = runtime.empty
+export const join = runtime.join
+export const raw = runtime.raw
+export const Sql = runtime.Sql
+export type Sql = runtime.Sql
+
+
+
+/**
+ * Decimal.js
+ */
+export const Decimal = runtime.Decimal
+export type Decimal = runtime.Decimal
+
+export type DecimalJsLike = runtime.DecimalJsLike
+
+/**
+* Extensions
+*/
+export type Extension = runtime.Types.Extensions.UserArgs
+export const getExtensionContext = runtime.Extensions.getExtensionContext
+export type Args<T, F extends runtime.Operation> = runtime.Types.Public.Args<T, F>
+export type Payload<T, F extends runtime.Operation = never> = runtime.Types.Public.Payload<T, F>
+export type Result<T, A, F extends runtime.Operation> = runtime.Types.Public.Result<T, A, F>
+export type Exact<A, W> = runtime.Types.Public.Exact<A, W>
+
+export type PrismaVersion = {
+  client: string
+  engine: string
+}
+
+/**
+ * Prisma Client JS version: 7.10.1
+ * Query Engine version: d1b3f377ca835d73fd50954a5e22128b9ebdd6b8
+ */
+export const prismaVersion: PrismaVersion = {
+  client: "7.10.1",
+  engine: "d1b3f377ca835d73fd50954a5e22128b9ebdd6b8"
+}
+
+/**
+ * Utility Types
+ */
+
+export type Bytes = runtime.Bytes
+export type JsonObject = runtime.JsonObject
+export type JsonArray = runtime.JsonArray
+export type JsonValue = runtime.JsonValue
+export type InputJsonObject = runtime.InputJsonObject
+export type InputJsonArray = runtime.InputJsonArray
+export type InputJsonValue = runtime.InputJsonValue
+
+
+export const NullTypes = {
+  DbNull: runtime.NullTypes.DbNull as (new (secret: never) => typeof runtime.DbNull),
+  JsonNull: runtime.NullTypes.JsonNull as (new (secret: never) => typeof runtime.JsonNull),
+  AnyNull: runtime.NullTypes.AnyNull as (new (secret: never) => typeof runtime.AnyNull),
+}
+/**
+ * Helper for filtering JSON entries that have `null` on the database (empty on the db)
+ *
+ * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+ */
+export const DbNull = runtime.DbNull
+
+/**
+ * Helper for filtering JSON entries that have JSON `null` values (not empty on the db)
+ *
+ * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+ */
+export const JsonNull = runtime.JsonNull
+
+/**
+ * Helper for filtering JSON entries that are `Prisma.DbNull` or `Prisma.JsonNull`
+ *
+ * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+ */
+export const AnyNull = runtime.AnyNull
+
+
+type SelectAndInclude = {
+  select: any
+  include: any
+}
+
+type SelectAndOmit = {
+  select: any
+  omit: any
+}
+
+/**
+ * From T, pick a set of properties whose keys are in the union K
+ */
+type Prisma__Pick<T, K extends keyof T> = {
+    [P in K]: T[P];
+};
+
+export type Enumerable<T> = T | Array<T>;
+
+/**
+ * Subset
+ * @desc From `T` pick properties that exist in `U`. Simple version of Intersection
+ */
+export type Subset<T, U> = {
+  [key in keyof T]: key extends keyof U ? T[key] : never;
+};
+
+/**
+ * Resolved type of the argument passed to the `PrismaClient` constructor.
+ *
+ * When called without a narrower options type (the common case), this resolves
+ * to `PrismaClientOptions` directly, which produces a clear TypeScript error
+ * message (`not assignable to parameter of type 'PrismaClientOptions'`) when
+ * the argument is missing or incomplete. When the user supplies a narrower
+ * options type (e.g. via a literal), it falls back to `Subset` to keep
+ * filtering out unknown properties.
+ */
+export type PrismaClientConstructorArgs<Options extends PrismaClientOptions> =
+  [PrismaClientOptions] extends [Options] ? PrismaClientOptions : Subset<Options, PrismaClientOptions>;
+
+/**
+ * SelectSubset
+ * @desc From `T` pick properties that exist in `U`. Simple version of Intersection.
+ * Additionally, it validates, if both select and include are present. If the case, it errors.
+ */
+export type SelectSubset<T, U> = {
+  [key in keyof T]: key extends keyof U ? T[key] : never
+} &
+  (T extends SelectAndInclude
+    ? 'Please either choose `select` or `include`.'
+    : T extends SelectAndOmit
+      ? 'Please either choose `select` or `omit`.'
+      : {})
+
+/**
+ * Subset + Intersection
+ * @desc From `T` pick properties that exist in `U` and intersect `K`
+ */
+export type SubsetIntersection<T, U, K> = {
+  [key in keyof T]: key extends keyof U ? T[key] : never
+} &
+  K
+
+type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never };
+
+/**
+ * XOR is needed to have a real mutually exclusive union type
+ * https://stackoverflow.com/questions/42123407/does-typescript-support-mutually-exclusive-types
+ */
+export type XOR<T, U> =
+  T extends object ?
+  U extends object ?
+    ((Without<T, U> & U) | (Without<U, T> & T)) & object
+  : U : T
+
+
+/**
+ * Is T a Record?
+ */
+type IsObject<T extends any> = T extends Array<any>
+? False
+: T extends Date
+? False
+: T extends Uint8Array
+? False
+: T extends BigInt
+? False
+: T extends object
+? True
+: False
+
+
+/**
+ * If it's T[], return T
+ */
+export type UnEnumerate<T extends unknown> = T extends Array<infer U> ? U : T
+
+/**
+ * From ts-toolbelt
+ */
+
+type __Either<O extends object, K extends Key> = Omit<O, K> &
+  {
+    // Merge all but K
+    [P in K]: Prisma__Pick<O, P & keyof O> // With K possibilities
+  }[K]
+
+type EitherStrict<O extends object, K extends Key> = Strict<__Either<O, K>>
+
+type EitherLoose<O extends object, K extends Key> = ComputeRaw<__Either<O, K>>
+
+type _Either<
+  O extends object,
+  K extends Key,
+  strict extends Boolean
+> = {
+  1: EitherStrict<O, K>
+  0: EitherLoose<O, K>
+}[strict]
+
+export type Either<
+  O extends object,
+  K extends Key,
+  strict extends Boolean = 1
+> = O extends unknown ? _Either<O, K, strict> : never
+
+export type Union = any
+
+export type PatchUndefined<O extends object, O1 extends object> = {
+  [K in keyof O]: O[K] extends undefined ? At<O1, K> : O[K]
+} & {}
+
+/** Helper Types for "Merge" **/
+export type IntersectOf<U extends Union> = (
+  U extends unknown ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
+  : never
+
+export type Overwrite<O extends object, O1 extends object> = {
+    [K in keyof O]: K extends keyof O1 ? O1[K] : O[K];
+} & {};
+
+type _Merge<U extends object> = IntersectOf<Overwrite<U, {
+    [K in keyof U]-?: At<U, K>;
+}>>;
+
+type Key = string | number | symbol;
+type AtStrict<O extends object, K extends Key> = O[K & keyof O];
+type AtLoose<O extends object, K extends Key> = O extends unknown ? AtStrict<O, K> : never;
+export type At<O extends object, K extends Key, strict extends Boolean = 1> = {
+    1: AtStrict<O, K>;
+    0: AtLoose<O, K>;
+}[strict];
+
+export type ComputeRaw<A extends any> = A extends Function ? A : {
+  [K in keyof A]: A[K];
+} & {};
+
+export type OptionalFlat<O> = {
+  [K in keyof O]?: O[K];
+} & {};
+
+type _Record<K extends keyof any, T> = {
+  [P in K]: T;
+};
+
+// cause typescript not to expand types and preserve names
+type NoExpand<T> = T extends unknown ? T : never;
+
+// this type assumes the passed object is entirely optional
+export type AtLeast<O extends object, K extends string> = NoExpand<
+  O extends unknown
+  ? | (K extends keyof O ? { [P in K]: O[P] } & O : O)
+    | {[P in keyof O as P extends K ? P : never]-?: O[P]} & O
+  : never>;
+
+type _Strict<U, _U = U> = U extends unknown ? U & OptionalFlat<_Record<Exclude<Keys<_U>, keyof U>, never>> : never;
+
+export type Strict<U extends object> = ComputeRaw<_Strict<U>>;
+/** End Helper Types for "Merge" **/
+
+export type Merge<U extends object> = ComputeRaw<_Merge<Strict<U>>>;
+
+export type Boolean = True | False
+
+export type True = 1
+
+export type False = 0
+
+export type Not<B extends Boolean> = {
+  0: 1
+  1: 0
+}[B]
+
+export type Extends<A1 extends any, A2 extends any> = [A1] extends [never]
+  ? 0 // anything `never` is false
+  : A1 extends A2
+  ? 1
+  : 0
+
+export type Has<U extends Union, U1 extends Union> = Not<
+  Extends<Exclude<U1, U>, U1>
+>
+
+export type Or<B1 extends Boolean, B2 extends Boolean> = {
+  0: {
+    0: 0
+    1: 1
+  }
+  1: {
+    0: 1
+    1: 1
+  }
+}[B1][B2]
+
+export type Keys<U extends Union> = U extends unknown ? keyof U : never
+
+export type GetScalarType<T, O> = O extends object ? {
+  [P in keyof T]: P extends keyof O
+    ? O[P]
+    : never
+} : never
+
+type FieldPaths<
+  T,
+  U = Omit<T, '_avg' | '_sum' | '_count' | '_min' | '_max'>
+> = IsObject<T> extends True ? U : T
+
+export type GetHavingFields<T> = {
+  [K in keyof T]: Or<
+    Or<Extends<'OR', K>, Extends<'AND', K>>,
+    Extends<'NOT', K>
+  > extends True
+    ? // infer is only needed to not hit TS limit
+      // based on the brilliant idea of Pierre-Antoine Mills
+      // https://github.com/microsoft/TypeScript/issues/30188#issuecomment-478938437
+      T[K] extends infer TK
+      ? GetHavingFields<UnEnumerate<TK> extends object ? Merge<UnEnumerate<TK>> : never>
+      : never
+    : {} extends FieldPaths<T[K]>
+    ? never
+    : K
+}[keyof T]
+
+/**
+ * Convert tuple to union
+ */
+type _TupleToUnion<T> = T extends (infer E)[] ? E : never
+type TupleToUnion<K extends readonly any[]> = _TupleToUnion<K>
+export type MaybeTupleToUnion<T> = T extends any[] ? TupleToUnion<T> : T
+
+/**
+ * Like `Pick`, but additionally can also accept an array of keys
+ */
+export type PickEnumerable<T, K extends Enumerable<keyof T> | keyof T> = Prisma__Pick<T, MaybeTupleToUnion<K>>
+
+/**
+ * Exclude all keys with underscores
+ */
+export type ExcludeUnderscoreKeys<T extends string> = T extends `_${string}` ? never : T
+
+
+export type FieldRef<Model, FieldType> = runtime.FieldRef<Model, FieldType>
+
+type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRef<Model, FieldType>
+
+
+export const ModelName = {
+  User: 'User',
+  RefreshToken: 'RefreshToken',
+  Category: 'Category',
+  MenuItem: 'MenuItem',
+  Order: 'Order',
+  OrderItem: 'OrderItem',
+  OrderStatusHistory: 'OrderStatusHistory'
+} as const
+
+export type ModelName = (typeof ModelName)[keyof typeof ModelName]
+
+
+
+export interface TypeMapCb<GlobalOmitOptions = {}> extends runtime.Types.Utils.Fn<{extArgs: runtime.Types.Extensions.InternalArgs }, runtime.Types.Utils.Record<string, any>> {
+  returns: TypeMap<this['params']['extArgs'], GlobalOmitOptions>
+}
+
+export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> = {
+  globalOmitOptions: {
+    omit: GlobalOmitOptions
+  }
+  meta: {
+    modelProps: "user" | "refreshToken" | "category" | "menuItem" | "order" | "orderItem" | "orderStatusHistory"
+    txIsolationLevel: TransactionIsolationLevel
+  }
+  model: {
+    User: {
+      payload: Prisma.$UserPayload<ExtArgs>
+      fields: Prisma.UserFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.UserFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.UserFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>
+        }
+        findFirst: {
+          args: Prisma.UserFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.UserFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>
+        }
+        findMany: {
+          args: Prisma.UserFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[]
+        }
+        create: {
+          args: Prisma.UserCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>
+        }
+        createMany: {
+          args: Prisma.UserCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.UserCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[]
+        }
+        delete: {
+          args: Prisma.UserDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>
+        }
+        update: {
+          args: Prisma.UserUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>
+        }
+        deleteMany: {
+          args: Prisma.UserDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.UserUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.UserUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>[]
+        }
+        upsert: {
+          args: Prisma.UserUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPayload>
+        }
+        aggregate: {
+          args: Prisma.UserAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUser>
+        }
+        groupBy: {
+          args: Prisma.UserGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.UserCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    RefreshToken: {
+      payload: Prisma.$RefreshTokenPayload<ExtArgs>
+      fields: Prisma.RefreshTokenFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RefreshTokenFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RefreshTokenFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>
+        }
+        findFirst: {
+          args: Prisma.RefreshTokenFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RefreshTokenFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>
+        }
+        findMany: {
+          args: Prisma.RefreshTokenFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>[]
+        }
+        create: {
+          args: Prisma.RefreshTokenCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>
+        }
+        createMany: {
+          args: Prisma.RefreshTokenCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RefreshTokenCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>[]
+        }
+        delete: {
+          args: Prisma.RefreshTokenDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>
+        }
+        update: {
+          args: Prisma.RefreshTokenUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>
+        }
+        deleteMany: {
+          args: Prisma.RefreshTokenDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RefreshTokenUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RefreshTokenUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>[]
+        }
+        upsert: {
+          args: Prisma.RefreshTokenUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenPayload>
+        }
+        aggregate: {
+          args: Prisma.RefreshTokenAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRefreshToken>
+        }
+        groupBy: {
+          args: Prisma.RefreshTokenGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RefreshTokenGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RefreshTokenCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RefreshTokenCountAggregateOutputType> | number
+        }
+      }
+    }
+    Category: {
+      payload: Prisma.$CategoryPayload<ExtArgs>
+      fields: Prisma.CategoryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CategoryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CategoryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>
+        }
+        findFirst: {
+          args: Prisma.CategoryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CategoryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>
+        }
+        findMany: {
+          args: Prisma.CategoryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>[]
+        }
+        create: {
+          args: Prisma.CategoryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>
+        }
+        createMany: {
+          args: Prisma.CategoryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CategoryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>[]
+        }
+        delete: {
+          args: Prisma.CategoryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>
+        }
+        update: {
+          args: Prisma.CategoryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>
+        }
+        deleteMany: {
+          args: Prisma.CategoryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CategoryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CategoryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>[]
+        }
+        upsert: {
+          args: Prisma.CategoryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CategoryPayload>
+        }
+        aggregate: {
+          args: Prisma.CategoryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCategory>
+        }
+        groupBy: {
+          args: Prisma.CategoryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CategoryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CategoryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CategoryCountAggregateOutputType> | number
+        }
+      }
+    }
+    MenuItem: {
+      payload: Prisma.$MenuItemPayload<ExtArgs>
+      fields: Prisma.MenuItemFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MenuItemFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MenuItemFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>
+        }
+        findFirst: {
+          args: Prisma.MenuItemFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MenuItemFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>
+        }
+        findMany: {
+          args: Prisma.MenuItemFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>[]
+        }
+        create: {
+          args: Prisma.MenuItemCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>
+        }
+        createMany: {
+          args: Prisma.MenuItemCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MenuItemCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>[]
+        }
+        delete: {
+          args: Prisma.MenuItemDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>
+        }
+        update: {
+          args: Prisma.MenuItemUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>
+        }
+        deleteMany: {
+          args: Prisma.MenuItemDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MenuItemUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MenuItemUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>[]
+        }
+        upsert: {
+          args: Prisma.MenuItemUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MenuItemPayload>
+        }
+        aggregate: {
+          args: Prisma.MenuItemAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMenuItem>
+        }
+        groupBy: {
+          args: Prisma.MenuItemGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MenuItemGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MenuItemCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MenuItemCountAggregateOutputType> | number
+        }
+      }
+    }
+    Order: {
+      payload: Prisma.$OrderPayload<ExtArgs>
+      fields: Prisma.OrderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OrderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OrderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>
+        }
+        findFirst: {
+          args: Prisma.OrderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OrderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>
+        }
+        findMany: {
+          args: Prisma.OrderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>[]
+        }
+        create: {
+          args: Prisma.OrderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>
+        }
+        createMany: {
+          args: Prisma.OrderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OrderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>[]
+        }
+        delete: {
+          args: Prisma.OrderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>
+        }
+        update: {
+          args: Prisma.OrderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>
+        }
+        deleteMany: {
+          args: Prisma.OrderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OrderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OrderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>[]
+        }
+        upsert: {
+          args: Prisma.OrderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderPayload>
+        }
+        aggregate: {
+          args: Prisma.OrderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOrder>
+        }
+        groupBy: {
+          args: Prisma.OrderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OrderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    OrderItem: {
+      payload: Prisma.$OrderItemPayload<ExtArgs>
+      fields: Prisma.OrderItemFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OrderItemFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OrderItemFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>
+        }
+        findFirst: {
+          args: Prisma.OrderItemFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OrderItemFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>
+        }
+        findMany: {
+          args: Prisma.OrderItemFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>[]
+        }
+        create: {
+          args: Prisma.OrderItemCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>
+        }
+        createMany: {
+          args: Prisma.OrderItemCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OrderItemCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>[]
+        }
+        delete: {
+          args: Prisma.OrderItemDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>
+        }
+        update: {
+          args: Prisma.OrderItemUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>
+        }
+        deleteMany: {
+          args: Prisma.OrderItemDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OrderItemUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OrderItemUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>[]
+        }
+        upsert: {
+          args: Prisma.OrderItemUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderItemPayload>
+        }
+        aggregate: {
+          args: Prisma.OrderItemAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOrderItem>
+        }
+        groupBy: {
+          args: Prisma.OrderItemGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderItemGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OrderItemCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderItemCountAggregateOutputType> | number
+        }
+      }
+    }
+    OrderStatusHistory: {
+      payload: Prisma.$OrderStatusHistoryPayload<ExtArgs>
+      fields: Prisma.OrderStatusHistoryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OrderStatusHistoryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OrderStatusHistoryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>
+        }
+        findFirst: {
+          args: Prisma.OrderStatusHistoryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OrderStatusHistoryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>
+        }
+        findMany: {
+          args: Prisma.OrderStatusHistoryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>[]
+        }
+        create: {
+          args: Prisma.OrderStatusHistoryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>
+        }
+        createMany: {
+          args: Prisma.OrderStatusHistoryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OrderStatusHistoryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>[]
+        }
+        delete: {
+          args: Prisma.OrderStatusHistoryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>
+        }
+        update: {
+          args: Prisma.OrderStatusHistoryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>
+        }
+        deleteMany: {
+          args: Prisma.OrderStatusHistoryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OrderStatusHistoryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OrderStatusHistoryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>[]
+        }
+        upsert: {
+          args: Prisma.OrderStatusHistoryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderStatusHistoryPayload>
+        }
+        aggregate: {
+          args: Prisma.OrderStatusHistoryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOrderStatusHistory>
+        }
+        groupBy: {
+          args: Prisma.OrderStatusHistoryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderStatusHistoryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OrderStatusHistoryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderStatusHistoryCountAggregateOutputType> | number
+        }
+      }
+    }
+  }
+} & {
+  other: {
+    payload: any
+    operations: {
+      $executeRaw: {
+        args: [query: TemplateStringsArray | Sql, ...values: any[]],
+        result: any
+      }
+      $executeRawUnsafe: {
+        args: [query: string, ...values: any[]],
+        result: any
+      }
+      $queryRaw: {
+        args: [query: TemplateStringsArray | Sql, ...values: any[]],
+        result: any
+      }
+      $queryRawUnsafe: {
+        args: [query: string, ...values: any[]],
+        result: any
+      }
+    }
+  }
+}
+
+/**
+ * Enums
+ */
+
+export const TransactionIsolationLevel = runtime.makeStrictEnum({
+  ReadUncommitted: 'ReadUncommitted',
+  ReadCommitted: 'ReadCommitted',
+  RepeatableRead: 'RepeatableRead',
+  Serializable: 'Serializable'
+} as const)
+
+export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
+
+
+export const UserScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  email: 'email',
+  emailNormalized: 'emailNormalized',
+  passwordHash: 'passwordHash',
+  role: 'role',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const RefreshTokenScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenHash: 'tokenHash',
+  expiresAt: 'expiresAt',
+  revokedAt: 'revokedAt',
+  replacedByTokenId: 'replacedByTokenId',
+  createdAt: 'createdAt'
+} as const
+
+export type RefreshTokenScalarFieldEnum = (typeof RefreshTokenScalarFieldEnum)[keyof typeof RefreshTokenScalarFieldEnum]
+
+
+export const CategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  nameNormalized: 'nameNormalized',
+  description: 'description',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CategoryScalarFieldEnum = (typeof CategoryScalarFieldEnum)[keyof typeof CategoryScalarFieldEnum]
+
+
+export const MenuItemScalarFieldEnum = {
+  id: 'id',
+  categoryId: 'categoryId',
+  name: 'name',
+  description: 'description',
+  price: 'price',
+  imageUrl: 'imageUrl',
+  isAvailable: 'isAvailable',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MenuItemScalarFieldEnum = (typeof MenuItemScalarFieldEnum)[keyof typeof MenuItemScalarFieldEnum]
+
+
+export const OrderScalarFieldEnum = {
+  id: 'id',
+  customerId: 'customerId',
+  status: 'status',
+  paymentMethod: 'paymentMethod',
+  paymentStatus: 'paymentStatus',
+  subtotal: 'subtotal',
+  notes: 'notes',
+  acceptanceDeadline: 'acceptanceDeadline',
+  idempotencyKey: 'idempotencyKey',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
+
+
+export const OrderItemScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  menuItemId: 'menuItemId',
+  itemName: 'itemName',
+  unitPrice: 'unitPrice',
+  quantity: 'quantity',
+  lineTotal: 'lineTotal',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderItemScalarFieldEnum = (typeof OrderItemScalarFieldEnum)[keyof typeof OrderItemScalarFieldEnum]
+
+
+export const OrderStatusHistoryScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  previousStatus: 'previousStatus',
+  newStatus: 'newStatus',
+  changedById: 'changedById',
+  changeSource: 'changeSource',
+  reasonCode: 'reasonCode',
+  reasonNote: 'reasonNote',
+  changedAt: 'changedAt'
+} as const
+
+export type OrderStatusHistoryScalarFieldEnum = (typeof OrderStatusHistoryScalarFieldEnum)[keyof typeof OrderStatusHistoryScalarFieldEnum]
+
+
+export const SortOrder = {
+  asc: 'asc',
+  desc: 'desc'
+} as const
+
+export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const QueryMode = {
+  default: 'default',
+  insensitive: 'insensitive'
+} as const
+
+export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+
+/**
+ * Field references
+ */
+
+
+/**
+ * Reference to a field of type 'String'
+ */
+export type StringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'String'>
+    
+
+
+/**
+ * Reference to a field of type 'String[]'
+ */
+export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'String[]'>
+    
+
+
+/**
+ * Reference to a field of type 'UserRole'
+ */
+export type EnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole'>
+    
+
+
+/**
+ * Reference to a field of type 'UserRole[]'
+ */
+export type ListEnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime'
+ */
+export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime[]'
+ */
+export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Decimal'
+ */
+export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal'>
+    
+
+
+/**
+ * Reference to a field of type 'Decimal[]'
+ */
+export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal[]'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderStatus'
+ */
+export type EnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderStatus[]'
+ */
+export type ListEnumOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentMethod'
+ */
+export type EnumPaymentMethodFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentMethod'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentMethod[]'
+ */
+export type ListEnumPaymentMethodFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentMethod[]'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentStatus'
+ */
+export type EnumPaymentStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentStatus[]'
+ */
+export type ListEnumPaymentStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Int[]'
+ */
+export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderChangeSource'
+ */
+export type EnumOrderChangeSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderChangeSource'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderChangeSource[]'
+ */
+export type ListEnumOrderChangeSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderChangeSource[]'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderReasonCode'
+ */
+export type EnumOrderReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderReasonCode'>
+    
+
+
+/**
+ * Reference to a field of type 'OrderReasonCode[]'
+ */
+export type ListEnumOrderReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderReasonCode[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Float'
+ */
+export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+/**
+ * Reference to a field of type 'Float[]'
+ */
+export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
+
+/**
+ * Batch Payload for updateMany & deleteMany & createMany
+ */
+export type BatchPayload = {
+  count: number
+}
+
+export const defineExtension = runtime.Extensions.defineExtension as unknown as runtime.Types.Extensions.ExtendsHook<"define", TypeMapCb, runtime.Types.Extensions.DefaultArgs>
+export type DefaultPrismaClient = PrismaClient
+export type ErrorFormat = 'pretty' | 'colorless' | 'minimal'
+/**
+ * Options common to all variants of `PrismaClientOptions`, regardless of whether you connect to your database through a driver adapter or through Prisma Accelerate.
+ */
+export interface PrismaClientBaseOptions {
+  /**
+   * @default "colorless"
+   */
+  errorFormat?: ErrorFormat
+  /**
+   * @example
+   * ```
+   * // Shorthand for `emit: 'stdout'`
+   * log: ['query', 'info', 'warn', 'error']
+   * 
+   * // Emit as events only
+   * log: [
+   *   { emit: 'event', level: 'query' },
+   *   { emit: 'event', level: 'info' },
+   *   { emit: 'event', level: 'warn' }
+   *   { emit: 'event', level: 'error' }
+   * ]
+   * 
+   * / Emit as events and log to stdout
+   * og: [
+   *  { emit: 'stdout', level: 'query' },
+   *  { emit: 'stdout', level: 'info' },
+   *  { emit: 'stdout', level: 'warn' }
+   *  { emit: 'stdout', level: 'error' }
+   * 
+   * ```
+   * Read more in our [docs](https://pris.ly/d/logging).
+   */
+  log?: (LogLevel | LogDefinition)[]
+  /**
+   * The default values for transactionOptions
+   * maxWait ?= 2000
+   * timeout ?= 5000
+   */
+  transactionOptions?: {
+    maxWait?: number
+    timeout?: number
+    isolationLevel?: TransactionIsolationLevel
+  }
+  /**
+   * Global configuration for omitting model fields by default.
+   * 
+   * @example
+   * ```
+   * const prisma = new PrismaClient({
+   *   omit: {
+   *     user: {
+   *       password: true
+   *     }
+   *   }
+   * })
+   * ```
+   */
+  omit?: GlobalOmitConfig
+  /**
+   * SQL commenter plugins that add metadata to SQL queries as comments.
+   * Comments follow the sqlcommenter format: https://google.github.io/sqlcommenter/
+   * 
+   * @example
+   * ```
+   * const prisma = new PrismaClient({
+   *   adapter,
+   *   comments: [
+   *     traceContext(),
+   *     queryInsights(),
+   *   ],
+   * })
+   * ```
+   */
+  comments?: runtime.SqlCommenterPlugin[]
+  /**
+   * Optional maximum size for the query plan cache. If not provided, a default size will be used.
+   * A value of `0` can be used to disable the cache entirely. A higher cache size can improve
+   * performance for applications that execute a large number of unique queries, while a smaller
+   * cache size can reduce memory usage.
+   * 
+   * @example
+   * ```
+   * const prisma = new PrismaClient({
+   *   adapter,
+   *   queryPlanCacheMaxSize: 100,
+   * })
+   * ```
+   */
+  queryPlanCacheMaxSize?: number
+}
+
+/**
+ * `PrismaClient` options for connecting to your database through Prisma Accelerate instead of a driver adapter.
+ * 
+ * Learn more: https://pris.ly/d/accelerate
+ */
+export interface PrismaClientOptionsWithAccelerateUrl extends PrismaClientBaseOptions {
+  /**
+   * The Prisma Accelerate connection URL. Use this option to connect to your database through Prisma Accelerate instead of using a driver adapter to connect directly.
+   * 
+   * Learn more: https://pris.ly/d/accelerate
+   */
+  accelerateUrl: string
+  adapter?: never
+}
+
+/**
+ * `PrismaClient` options for connecting to your database through a driver adapter. This is the common case in Prisma 7.
+ * 
+ * Learn more: https://pris.ly/d/driver-adapters
+ */
+export interface PrismaClientOptionsWithAdapter extends PrismaClientBaseOptions {
+  /**
+   * A driver adapter that PrismaClient uses to connect to your database, such as the ones provided by `@prisma/adapter-pg`, `@prisma/adapter-libsql`, `@prisma/adapter-planetscale`, etc.
+   * 
+   * A driver adapter is **required** unless you connect to your database through Prisma Accelerate (in which case use `accelerateUrl` instead).
+   * 
+   * Learn more: https://pris.ly/d/driver-adapters
+   * 
+   * @example
+   * ```ts
+   * import { PrismaPg } from '@prisma/adapter-pg'
+   * import { PrismaClient } from './generated/prisma/client'
+   * 
+   * const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+   * const prisma = new PrismaClient({ adapter })
+   * ```
+   */
+  adapter: runtime.SqlDriverAdapterFactory
+  accelerateUrl?: never
+}
+
+/**
+ * Options passed to the `PrismaClient` constructor.
+ * 
+ * A driver adapter (or, alternatively, a Prisma Accelerate URL) is **required**. See {@link PrismaClientOptionsWithAdapter} and {@link PrismaClientOptionsWithAccelerateUrl} for the two variants. All other properties live in {@link PrismaClientBaseOptions} and are optional.
+ * 
+ * Learn more about driver adapters: https://pris.ly/d/driver-adapters
+ */
+export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaClientOptionsWithAdapter
+export type GlobalOmitConfig = {
+  user?: Prisma.UserOmit
+  refreshToken?: Prisma.RefreshTokenOmit
+  category?: Prisma.CategoryOmit
+  menuItem?: Prisma.MenuItemOmit
+  order?: Prisma.OrderOmit
+  orderItem?: Prisma.OrderItemOmit
+  orderStatusHistory?: Prisma.OrderStatusHistoryOmit
+}
+
+/* Types for Logging */
+export type LogLevel = 'info' | 'query' | 'warn' | 'error'
+export type LogDefinition = {
+  level: LogLevel
+  emit: 'stdout' | 'event'
+}
+
+export type CheckIsLogLevel<T> = T extends LogLevel ? T : never;
+
+export type GetLogType<T> = CheckIsLogLevel<
+  T extends LogDefinition ? T['level'] : T
+>;
+
+export type GetEvents<T extends any[]> = T extends Array<LogLevel | LogDefinition>
+  ? GetLogType<T[number]>
+  : never;
+
+export type QueryEvent = {
+  timestamp: Date
+  query: string
+  params: string
+  duration: number
+  target: string
+}
+
+export type LogEvent = {
+  timestamp: Date
+  message: string
+  target: string
+}
+/* End Types for Logging */
+
+
+export type PrismaAction =
+  | 'findUnique'
+  | 'findUniqueOrThrow'
+  | 'findMany'
+  | 'findFirst'
+  | 'findFirstOrThrow'
+  | 'create'
+  | 'createMany'
+  | 'createManyAndReturn'
+  | 'update'
+  | 'updateMany'
+  | 'updateManyAndReturn'
+  | 'upsert'
+  | 'delete'
+  | 'deleteMany'
+  | 'executeRaw'
+  | 'queryRaw'
+  | 'aggregate'
+  | 'count'
+  | 'runCommandRaw'
+  | 'findRaw'
+  | 'groupBy'
+
+/**
+ * `PrismaClient` proxy available in interactive transactions.
+ */
+export type TransactionClient = Omit<DefaultPrismaClient, runtime.ITXClientDenyList>
+
+===== D:\My Projects\food-ordering-platform\apps\api\src\generated\prisma\client.ts
+
+/* !!! This is code generated by Prisma. Do not edit directly. !!! */
+/* eslint-disable */
+// biome-ignore-all lint: generated file
+// @ts-nocheck 
+/*
+ * This file should be your main import to use Prisma. Through it you get access to all the models, enums, and input types.
+ * If you're looking for something you can import in the client-side of your application, please refer to the `browser.ts` file instead.
+ *
+ * 🟢 You can import this file directly.
+ */
+
+import * as process from 'node:process'
+import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
+globalThis['__dirname'] = path.dirname(fileURLToPath(import.meta.url))
+
+import * as runtime from "@prisma/client/runtime/client"
+import * as $Enums from "./enums.js"
+import * as $Class from "./internal/class.js"
+import * as Prisma from "./internal/prismaNamespace.js"
+
+export * as $Enums from './enums.js'
+export * from "./enums.js"
+/**
+ * ## Prisma Client
+ * 
+ * Type-safe database client for TypeScript
+ * @example
+ * ```
+ * const prisma = new PrismaClient({
+ *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+ * })
+ * // Fetch zero or more Users
+ * const users = await prisma.user.findMany()
+ * ```
+ * 
+ * Read more in our [docs](https://pris.ly/d/client).
+ */
+export const PrismaClient = $Class.getPrismaClientClass()
+export type PrismaClient<LogOpts extends Prisma.LogLevel = never, OmitOpts extends Prisma.PrismaClientOptions["omit"] = Prisma.PrismaClientOptions["omit"], ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = $Class.PrismaClient<LogOpts, OmitOpts, ExtArgs>
+export { Prisma }
+
+/**
+ * Model User
+ * 
+ */
+export type User = Prisma.UserModel
+/**
+ * Model RefreshToken
+ * 
+ */
+export type RefreshToken = Prisma.RefreshTokenModel
+/**
+ * Model Category
+ * 
+ */
+export type Category = Prisma.CategoryModel
+/**
+ * Model MenuItem
+ * 
+ */
+export type MenuItem = Prisma.MenuItemModel
+/**
+ * Model Order
+ * 
+ */
+export type Order = Prisma.OrderModel
+/**
+ * Model OrderItem
+ * 
+ */
+export type OrderItem = Prisma.OrderItemModel
+/**
+ * Model OrderStatusHistory
+ * 
+ */
+export type OrderStatusHistory = Prisma.OrderStatusHistoryModel
