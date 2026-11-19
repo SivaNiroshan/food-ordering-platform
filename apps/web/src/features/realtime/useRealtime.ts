@@ -28,7 +28,7 @@ export function useRealtime() {
 
   useEffect(() => {
     if (!userId || !role) return;
-    const { setConnected } = useRealtimeStore.getState();
+    const { setConnected, reset } = useRealtimeStore.getState();
 
     const socket: Socket<ServerToClientEvents> = io({
       autoConnect: false,
@@ -55,7 +55,8 @@ export function useRealtime() {
       setConnected(false);
       if (err.message !== 'UNAUTHORIZED' || refreshedForThisAttempt) return;
       refreshedForThisAttempt = true;
-      if (await refreshAccessToken()) socket.connect();
+      // If the server is down, the refresh throws; Socket.IO keeps retrying the connection anyway.
+      if (await refreshAccessToken().catch(() => null)) socket.connect();
     });
 
     socket.on('order:status_changed', (event) =>
@@ -68,7 +69,7 @@ export function useRealtime() {
     return () => {
       socket.removeAllListeners();
       socket.disconnect();
-      setConnected(false);
+      reset();
     };
   }, [userId, role, queryClient]);
 }

@@ -31,18 +31,21 @@ export class ApiError extends Error {
 let refreshInFlight: Promise<string | null> | null = null;
 
 async function callRefreshEndpoint(): Promise<string | null> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { accessToken: string };
-    useAuthStore.getState().setAccessToken(body.accessToken);
-    return body.accessToken;
+    res = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
   } catch {
-    return null;
+    throw new ApiError(0, 'NETWORK_ERROR', 'Cannot reach the server. Check your connection.');
   }
+  // Only a 401 means "your session is over". A 5xx or a proxy error means the server is
+  // down or restarting: the session may be perfectly valid, so we must not log the user out.
+  if (res.status === 401) return null;
+  if (!res.ok) {
+    throw new ApiError(res.status, 'SERVICE_UNAVAILABLE', 'The server isn’t responding right now.');
+  }
+  const body = (await res.json()) as { accessToken: string };
+  useAuthStore.getState().setAccessToken(body.accessToken);
+  return body.accessToken;
 }
 
 /**
@@ -54,6 +57,9 @@ async function callRefreshEndpoint(): Promise<string | null> {
  *  - within one tab, concurrent callers share one in-flight request;
  *  - across tabs, the Web Locks API runs one refresh at a time. The browser shares
  *    cookies between tabs, so the second tab sends the already-rotated cookie.
+ *
+ * Resolves to the new token, or null when the session has ended (401).
+ * Throws an ApiError when the server can't be reached, so callers keep the session.
  */
 export function refreshAccessToken(): Promise<string | null> {
   refreshInFlight ??= (async () => {
@@ -134,6 +140,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         res = await send(path, options, newToken);
       }
     }
+    // (If the refresh threw because the server is down, the error propagates and we stay logged in.)
     // Still unauthorized: the session is over (expired refresh, logout elsewhere, deactivated).
     if (res.status === 401) useAuthStore.getState().clearSession();
   }

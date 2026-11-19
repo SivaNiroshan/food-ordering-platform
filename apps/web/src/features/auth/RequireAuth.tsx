@@ -4,6 +4,7 @@ import { FullPageSpinner } from '../../components/ui/Spinner';
 import type { UserRole } from '../../lib/types';
 import { useAuthStore } from './auth-store';
 import { HOME_BY_ROLE } from './roles';
+import { ServerUnreachable } from './ServerUnreachable';
 
 /**
  * Guards a route on the client. This is only for user experience: the API enforces
@@ -15,6 +16,7 @@ export function RequireAuth({ roles, children }: { roles?: UserRole[]; children:
   const location = useLocation();
 
   if (status === 'unknown') return <FullPageSpinner />;
+  if (status === 'unreachable') return <ServerUnreachable />;
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
@@ -33,6 +35,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
 
   if (status === 'unknown') return <FullPageSpinner />;
+  if (status === 'unreachable') return <ServerUnreachable standalone />;
   if (user) return <Navigate to={HOME_BY_ROLE[user.role]} replace />;
   return children;
 }
@@ -43,5 +46,6 @@ export function HomeRedirect() {
   const user = useAuthStore((s) => s.user);
 
   if (status === 'unknown') return <FullPageSpinner />;
+  if (status === 'unreachable') return <ServerUnreachable standalone />;
   return <Navigate to={user ? HOME_BY_ROLE[user.role] : '/menu'} replace />;
 }

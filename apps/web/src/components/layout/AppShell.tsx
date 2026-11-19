@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import { logout } from '../../features/auth/auth-api';
 import { useAuthStore } from '../../features/auth/auth-store';
 import { useCartStore } from '../../features/cart/cart-store';
+import { ConnectionBanner } from '../../features/realtime/ConnectionBanner';
 import { useRealtime } from '../../features/realtime/useRealtime';
 import { cn } from '../../lib/cn';
 import type { UserRole } from '../../lib/types';
@@ -41,6 +42,8 @@ function navClass({ isActive }: { isActive: boolean }) {
 
 export function AppShell() {
   const user = useAuthStore((s) => s.user);
+  // While the server is unreachable we don't know who is logged in, so show no account links.
+  const unreachable = useAuthStore((s) => s.status === 'unreachable');
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
   const items = NAV_BY_ROLE[user?.role ?? 'GUEST'];
@@ -83,7 +86,7 @@ export function AppShell() {
                   Log out
                 </Button>
               </>
-            ) : (
+            ) : unreachable ? null : (
               <>
                 <NavLink to="/login" className={navClass}>
                   Log in
@@ -99,6 +102,7 @@ export function AppShell() {
             )}
           </div>
         </div>
+        <ConnectionBanner />
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <Outlet />

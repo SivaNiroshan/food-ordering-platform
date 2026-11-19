@@ -1,4 +1,4 @@
-import { apiRequest, refreshAccessToken } from '../../lib/api-client';
+import { ApiError, apiRequest, refreshAccessToken } from '../../lib/api-client';
 import type { User } from '../../lib/types';
 import { useAuthStore } from './auth-store';
 
@@ -35,20 +35,25 @@ export async function logout() {
 }
 
 /**
- * Runs once when the app starts. The access token was lost on reload, but the
+ * Runs when the app starts. The access token was lost on reload, but the
  * httpOnly refresh cookie survives, so we exchange it for a new access token.
+ *
+ * Three outcomes: logged in, logged out (the server said 401), or "unreachable"
+ * (the server is down, so we don't know yet). Unreachable must NOT look like logged out.
  */
 export async function restoreSession() {
-  const { setSession, clearSession } = useAuthStore.getState();
-  const token = await refreshAccessToken();
-  if (!token) {
-    clearSession();
-    return;
-  }
+  const { setSession, clearSession, setStatus } = useAuthStore.getState();
+  setStatus('unknown');
   try {
+    const token = await refreshAccessToken();
+    if (!token) {
+      clearSession();
+      return;
+    }
     const user = await apiRequest<User>('/me');
     setSession(user, token);
-  } catch {
-    clearSession();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) clearSession();
+    else setStatus('unreachable');
   }
 }

@@ -115,4 +115,21 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/menu-items')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   });
+  it('keeps the user logged in when the server is down during a refresh', async () => {
+    fetchMock
+      .mockResolvedValueOnce(expired())
+      .mockResolvedValueOnce(json(502, { error: { code: 'BAD_GATEWAY', message: 'Bad gateway' } }));
+
+    await expect(apiRequest('/me')).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(useAuthStore.getState().status).toBe('authenticated');
+  });
+
+  it('keeps the user logged in when the refresh request cannot reach the server', async () => {
+    fetchMock
+      .mockResolvedValueOnce(expired())
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await expect(apiRequest('/me')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    expect(useAuthStore.getState().status).toBe('authenticated');
+  });
 });
