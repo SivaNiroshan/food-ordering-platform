@@ -81,6 +81,8 @@ export function CheckoutPage() {
   if (lines.length === 0) {
     return (
       <section className="mx-auto max-w-lg py-12">
+        {/* E.g. every item sold out while the customer was checking out: still say why. */}
+        {error && <Alert className="mb-6">{error}</Alert>}
         <h1 className="text-3xl font-bold">Your order is empty</h1>
         <p className="mt-2 text-ash">Add dishes from the menu to place an order.</p>
         <Link

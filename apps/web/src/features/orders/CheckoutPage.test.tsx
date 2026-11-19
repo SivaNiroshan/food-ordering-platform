@@ -132,6 +132,31 @@ describe('CheckoutPage', () => {
     expect(useCartStore.getState().lines.map((l) => l.menuItemId)).toEqual(['kottu']);
   });
 
+    it('still explains why when every item sold out and the order is now empty', async () => {
+    mockFetch((url) =>
+      url.pathname === '/api/v1/orders'
+        ? {
+            status: 409,
+            body: {
+              error: {
+                code: 'MENU_ITEM_UNAVAILABLE',
+                message: 'Some items are no longer available',
+                details: [{ menuItemId: 'kottu' }, { menuItemId: 'milo' }],
+              },
+            },
+          }
+        : undefined,
+    );
+    renderPage(<CheckoutPage />, { path: '/checkout' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Place order' }));
+
+    expect(await screen.findByRole('heading', { name: 'Your order is empty' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Chicken Kottu, Iced Milo are no longer available',
+    );
+  });
+
   it('shows an empty state when there is nothing to order', () => {
     useCartStore.getState().clear();
     renderPage(<CheckoutPage />, { path: '/checkout' });

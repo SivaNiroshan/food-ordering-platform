@@ -5,3 +5,5 @@ coverage/
 *.log
 .DS_Store
 apps/api/src/generated/
+playwright-report/
+test-results/

@@ -11,7 +11,7 @@ export const authRateLimit: RequestHandler =
     ? (_req, _res, next) => next()
     : rateLimit({
         windowMs: 60_000,
-        limit: 5,
+        limit: env.AUTH_RATE_LIMIT_PER_MINUTE,
         standardHeaders: 'draft-8',
         legacyHeaders: false,
         store: new RedisStore({
