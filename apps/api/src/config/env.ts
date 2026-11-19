@@ -9,6 +9,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.url().default('http://localhost:5173'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
+  // Login/register attempts per IP per minute. Raise it locally for the E2E tests.
+  AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(5),
   ORDER_ACCEPTANCE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(15),
   MINIMUM_ORDER_AMOUNT: z
     .string()
