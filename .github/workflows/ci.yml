@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same branch cancels the run that's still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Real Postgres and Redis for the API's integration tests.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: foodflow
+          POSTGRES_PASSWORD: foodflow
+          POSTGRES_DB: foodflow_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U foodflow -d foodflow_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://foodflow:foodflow@localhost:5432/foodflow_test
+      # The API's test setup uses this database instead of starting a Testcontainer.
+      TEST_DATABASE_URL: postgresql://foodflow:foodflow@localhost:5432/foodflow_test
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-only-secret-not-used-anywhere-real-0123456789
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies (also generates the Prisma client)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type-check
+        run: |
+          npm run typecheck -w @foodflow/api
+          npm run typecheck -w @foodflow/web
+          npx tsc -p e2e/tsconfig.json
+
+      - name: API tests (unit + integration)
+        run: npm test -w @foodflow/api
+
+      - name: Web tests
+        run: npm test -w @foodflow/web
+
+      - name: Build
+        run: |
+          npm run build -w @foodflow/api
+          npm run build -w @foodflow/web
+
+  e2e:
+    name: Docker build + end-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # Throwaway values for this run only. Docker Compose reads them from .env.
+      - name: Create .env for Docker Compose
+        run: |
+          cat > .env <<'ENV'
+          POSTGRES_USER=foodflow
+          POSTGRES_PASSWORD=foodflow
+          POSTGRES_DB=foodflow
+          JWT_ACCESS_SECRET=ci-only-secret-not-used-anywhere-real-0123456789
+          AUTH_RATE_LIMIT_PER_MINUTE=1000
+          ENV
+
+      - name: Build images and start the app
+        run: docker compose --profile app up --build -d
+
+      - name: Wait until the app answers through nginx
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/v1/categories > /dev/null; then
+              echo "App is up"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "The app did not start within 5 minutes"
+          docker compose --profile app ps -a
+          exit 1
+
+      - name: Seed demo accounts and menu
+        run: docker compose run --rm seed
+
+      # Only Playwright is needed on the runner; the app itself runs in the containers.
+      - name: Install test dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run end-to-end tests
+        run: npm run test:e2e
+        env:
+          E2E_BASE_URL: http://localhost:8080
+
+      - name: Container logs
+        if: failure()
+        run: docker compose --profile app logs --no-color migrate api worker web
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Stop containers
+        if: always()
+        run: docker compose --profile app down -v
