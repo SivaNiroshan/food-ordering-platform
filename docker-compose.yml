@@ -70,7 +70,11 @@ services:
       target: build
     working_dir: /app/apps/api
     command: ['npx', 'prisma', 'db', 'seed']
-    environment: *api-env
+    environment: 
+      <<: *api-env
+      # seed.ts only creates the demo accounts outside production (on purpose), and this
+      # service exists to load demo data locally and in CI.
+      NODE_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
